@@ -47,7 +47,6 @@ body {
 .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
 .hidden { display: none !important; }
 
-/* Кнопки */
 .btn {
     padding: 12px 24px;
     border: none;
@@ -131,7 +130,6 @@ body {
 }
 .btn-remove:hover { transform: scale(1.2); }
 
-/* Header */
 .header { 
     background: rgba(18, 18, 26, 0.95);
     border-bottom: 1px solid var(--color-border);
@@ -237,7 +235,6 @@ body {
 }
 .header-actions { display: flex; gap: 12px; align-items: center; }
 
-/* Breadcrumbs */
 .breadcrumbs { 
     background: var(--bg-secondary);
     padding: 16px 0; 
@@ -252,10 +249,8 @@ body {
 .breadcrumbs a:hover { color: var(--color-lime); }
 .breadcrumbs span { margin: 0 10px; color: var(--color-text-muted); }
 
-/* Main */
 .main { padding: 40px 0; min-height: calc(100vh - 200px); }
 
-/* Hero */
 .hero { 
     background: linear-gradient(135deg, rgba(192, 255, 0, 0.15) 0%, rgba(168, 230, 0, 0.05) 100%);
     padding: 100px 60px; 
@@ -297,7 +292,6 @@ body {
     margin-right: auto;
 }
 
-/* Categories */
 .categories, .products { margin: 80px 0; }
 .categories h2, .products h2 { 
     font-size: 36px; 
@@ -355,7 +349,6 @@ body {
 .category-card:hover .category-icon { transform: scale(1.1) rotate(5deg); }
 .category-card span { font-weight: 600; font-size: 15px; }
 
-/* Products Grid */
 .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; }
 .product-card {
     background: var(--bg-card);
@@ -473,7 +466,6 @@ body {
 }
 .product-seller i { width: 14px; text-align: center; }
 
-/* Auth */
 .auth-container { display: flex; justify-content: center; align-items: center; padding: 60px 0; }
 .auth-card { 
     background: var(--bg-card);
@@ -529,19 +521,6 @@ body {
     border-color: var(--color-lime);
     box-shadow: 0 0 0 3px rgba(192, 255, 0, 0.2);
 }
-.toggle-password { 
-    position: absolute; 
-    right: 16px; 
-    background: none; 
-    border: none; 
-    cursor: pointer; 
-    color: var(--color-text-muted); 
-    font-size: 16px; 
-    width: 16px; 
-    text-align: center;
-    transition: var(--transition);
-}
-.toggle-password:hover { color: var(--color-lime); }
 .form-hint { font-size: 12px; color: var(--color-text-muted); }
 .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; color: var(--color-text-secondary); }
 .checkbox-label input[type="checkbox"] {
@@ -553,7 +532,6 @@ body {
 .auth-footer a { color: var(--color-lime); font-weight: 600; text-decoration: none; }
 .auth-footer a:hover { text-decoration: underline; }
 
-/* Catalog */
 .catalog-layout { display: grid; grid-template-columns: 300px 1fr; gap: 30px; }
 .sidebar { 
     background: var(--bg-card);
@@ -685,7 +663,6 @@ body {
 }
 .empty-state p { font-size: 18px; }
 
-/* Profile */
 .profile-layout { display: grid; grid-template-columns: 280px 1fr; gap: 30px; }
 .profile-sidebar { 
     background: var(--bg-card);
@@ -780,7 +757,6 @@ body {
 }
 .profile-form textarea { resize: vertical; min-height: 120px; }
 
-/* Seller Profile */
 .seller-profile-header {
     position: relative;
     height: 250px;
@@ -834,7 +810,6 @@ body {
     font-size: 16px;
 }
 
-/* Orders */
 .order-card {
     background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
@@ -861,7 +836,6 @@ body {
 .order-status.confirmed { background: var(--color-success); color: #000; }
 .order-status.completed { background: var(--color-info); color: #000; }
 
-/* Reports */
 .report-card {
     background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
@@ -885,7 +859,6 @@ body {
     color: white;
 }
 
-/* Chat */
 .chat-container { 
     background: var(--bg-card);
     border-radius: var(--radius); 
@@ -953,7 +926,6 @@ body {
     box-shadow: 0 0 0 3px rgba(192, 255, 0, 0.2);
 }
 
-/* Cart */
 .cart-container {
     background: var(--bg-card);
     border-radius: var(--radius);
@@ -1024,7 +996,6 @@ body {
 .cart-total { font-size: 28px; font-weight: 800; }
 .cart-total span { color: var(--color-lime); }
 
-/* Admin */
 .admin-layout { display: grid; grid-template-columns: 260px 1fr; gap: 30px; }
 .admin-sidebar { 
     background: var(--bg-card);
@@ -1105,7 +1076,6 @@ body {
 .badge-admin { background: var(--color-lime); color: #000; }
 .badge-user { background: var(--bg-tertiary); color: var(--color-text-secondary); }
 
-/* Animations */
 .animate-on-scroll { 
     opacity: 0; 
     transform: translateY(30px); 
@@ -1113,7 +1083,6 @@ body {
 }
 .animate-on-scroll.visible { opacity: 1; transform: translateY(0); }
 
-/* Footer */
 .footer { 
     background: var(--bg-secondary);
     padding: 40px 0; 
@@ -1123,7 +1092,6 @@ body {
     border-top: 1px solid var(--color-border);
 }
 
-/* Адаптив */
 @media (max-width: 1024px) {
     .catalog-layout, .profile-layout, .admin-layout { grid-template-columns: 1fr; }
     .sidebar, .profile-sidebar, .admin-sidebar { position: static; }
