@@ -11,11 +11,22 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <a href="index.html" class="logo"><i class="fas fa-cube"></i><span>Ozon MC</span></a>
+                <a href="index.html" class="logo">
+                    <i class="fas fa-cube"></i>
+                    <span>Ozon MC</span>
+                </a>
             </div>
         </div>
     </header>
-    <div class="breadcrumbs"><div class="container"><a href="index.html">Главная</a><span>›</span><span>Регистрация</span></div></div>
+
+    <div class="breadcrumbs">
+        <div class="container">
+            <a href="index.html">Главная</a>
+            <span>›</span>
+            <span>Регистрация</span>
+        </div>
+    </div>
+
     <main class="main">
         <div class="container">
             <div class="auth-container animate-on-scroll">
@@ -24,32 +35,52 @@
                     <form id="registerForm" class="auth-form">
                         <div class="form-group">
                             <label for="regName">Имя</label>
-                            <div class="input-wrapper"><i class="fas fa-user"></i><input type="text" id="regName" required></div>
+                            <div class="input-wrapper">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="regName" required>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="regEmail">Email</label>
-                            <div class="input-wrapper"><i class="fas fa-envelope"></i><input type="email" id="regEmail" required></div>
+                            <div class="input-wrapper">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="regEmail" required>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="regLogin">Логин</label>
-                            <div class="input-wrapper"><i class="fas fa-at"></i><input type="text" id="regLogin" required></div>
+                            <div class="input-wrapper">
+                                <i class="fas fa-at"></i>
+                                <input type="text" id="regLogin" required>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="regPassword">Пароль</label>
-                            <div class="input-wrapper"><i class="fas fa-lock"></i><input type="password" id="regPassword" required><button type="button" class="toggle-password"><i class="fas fa-eye"></i></button></div>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="regPassword" required>
+                            </div>
                             <small class="form-hint">Минимум 8 символов, цифры и заглавные буквы</small>
                         </div>
                         <div class="form-group">
                             <label for="regPasswordConfirm">Подтвердите пароль</label>
-                            <div class="input-wrapper"><i class="fas fa-lock"></i><input type="password" id="regPasswordConfirm" required></div>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="regPasswordConfirm" required>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-user-plus"></i> Зарегистрироваться</button>
+                        <button type="submit" class="btn btn-primary btn-full">
+                            <i class="fas fa-user-plus"></i> Зарегистрироваться
+                        </button>
                     </form>
-                    <div class="auth-footer"><p>Уже есть аккаунт? <a href="login.html">Войти</a></p></div>
+                    <div class="auth-footer">
+                        <p>Уже есть аккаунт? <a href="login.html">Войти</a></p>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
+
     <script src="auth.js"></script>
     <script src="script.js"></script>
 </body>
