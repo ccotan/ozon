@@ -8,6 +8,7 @@
     --color-text-secondary: #666666;
     --color-danger: #FF3B30;
     --color-success: #34C759;
+    --color-minecraft: #5D8C3E;
     --radius: 20px;
     --radius-sm: 12px;
     --radius-xs: 8px;
@@ -50,6 +51,10 @@ body {
 .btn-large { padding: 16px 32px; font-size: 18px; }
 .btn-small { padding: 8px 16px; font-size: 14px; }
 .btn-full { width: 100%; }
+.btn-secondary { background: var(--color-light-gray); color: var(--color-text); }
+.btn-secondary:hover { background: var(--color-border); }
+.btn-danger { background: var(--color-danger); color: white; }
+.btn-danger:hover { opacity: 0.9; }
 
 .icon-btn {
     width: 44px; height: 44px;
@@ -64,6 +69,15 @@ body {
     font-size: 18px;
 }
 .icon-btn:hover { background: var(--color-lime); transform: scale(1.05); }
+
+.btn-remove {
+    background: none;
+    border: none;
+    color: var(--color-danger);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 8px;
+}
 
 /* Header */
 .header { background: var(--color-white); box-shadow: var(--shadow); position: sticky; top: 0; z-index: 100; }
@@ -107,6 +121,8 @@ body {
 .product-title { font-size: 18px; font-weight: 600; margin-bottom: 10px; }
 .product-price { font-size: 24px; font-weight: 700; color: var(--color-lime); }
 .product-category { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 8px; }
+.product-delivery { font-size: 13px; color: var(--color-minecraft); margin-top: 8px; display: flex; align-items: center; gap: 5px; }
+.product-delivery i { font-size: 12px; }
 
 /* Auth */
 .auth-container { display: flex; justify-content: center; align-items: center; padding: 40px 0; }
@@ -162,8 +178,19 @@ body {
 .profile-section.active { display: block; }
 .profile-section h1 { font-size: 28px; margin-bottom: 25px; }
 .profile-form { display: flex; flex-direction: column; gap: 20px; max-width: 600px; }
-.profile-form input, .profile-form textarea { padding: 12px 16px; border: 2px solid var(--color-border); border-radius: var(--radius-sm); font-size: 16px; font-family: inherit; }
-.profile-form input:focus, .profile-form textarea:focus { outline: none; border-color: var(--color-lime); }
+.profile-form input, .profile-form textarea, .profile-form select { padding: 12px 16px; border: 2px solid var(--color-border); border-radius: var(--radius-sm); font-size: 16px; font-family: inherit; }
+.profile-form input:focus, .profile-form textarea:focus, .profile-form select:focus { outline: none; border-color: var(--color-lime); }
+
+/* Delivery Settings */
+.delivery-settings { max-width: 700px; }
+.delivery-method-card { background: var(--color-light-gray); padding: 20px; border-radius: var(--radius-sm); margin-bottom: 20px; }
+.delivery-method-card h3 { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+.delivery-method-card h3 i { color: var(--color-lime); }
+.pickup-point { background: var(--color-white); padding: 20px; border-radius: var(--radius-sm); margin-bottom: 15px; border: 2px solid var(--color-border); }
+.pickup-point-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.delivery-info { background: var(--color-light-gray); padding: 15px; border-radius: var(--radius-sm); margin-top: 15px; }
+.delivery-info-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 14px; }
+.delivery-info-item i { color: var(--color-lime); width: 20px; }
 
 /* Seller */
 .seller-header { background: var(--color-white); padding: 40px; border-radius: var(--radius); box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; flex-wrap: wrap; gap: 20px; }
@@ -196,6 +223,25 @@ body {
 .badge-admin { background: var(--color-lime); }
 .badge-user { background: var(--color-light-gray); }
 
+/* Checkout */
+.checkout-layout { display: grid; grid-template-columns: 1fr 350px; gap: 30px; }
+.checkout-main { background: var(--color-white); padding: 30px; border-radius: var(--radius); box-shadow: var(--shadow); }
+.checkout-sidebar { background: var(--color-white); padding: 30px; border-radius: var(--radius); box-shadow: var(--shadow); height: fit-content; position: sticky; top: 100px; }
+.checkout-section { margin-bottom: 30px; }
+.checkout-section h2 { font-size: 22px; margin-bottom: 20px; }
+.delivery-options { display: flex; flex-direction: column; gap: 15px; }
+.delivery-option { border: 2px solid var(--color-border); border-radius: var(--radius-sm); padding: 20px; cursor: pointer; transition: var(--transition); }
+.delivery-option:hover { border-color: var(--color-lime); }
+.delivery-option.selected { border-color: var(--color-lime); background: rgba(192, 255, 0, 0.1); }
+.delivery-option-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.delivery-option-title { font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.delivery-option-title i { color: var(--color-lime); }
+.delivery-option-price { font-weight: 700; color: var(--color-lime); }
+.delivery-option-details { font-size: 14px; color: var(--color-text-secondary); }
+.order-summary { display: flex; flex-direction: column; gap: 15px; }
+.summary-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
+.summary-total { display: flex; justify-content: space-between; padding: 15px 0; font-size: 20px; font-weight: 700; border-top: 2px solid var(--color-border); margin-top: 10px; }
+
 /* Chat */
 .chat-container { background: var(--color-white); border-radius: var(--radius); box-shadow: var(--shadow); height: 600px; display: flex; flex-direction: column; }
 .chat-header { padding: 20px; border-bottom: 1px solid var(--color-border); font-weight: 600; font-size: 18px; }
@@ -220,8 +266,8 @@ body {
 
 /* Адаптив */
 @media (max-width: 900px) {
-    .catalog-layout, .profile-layout, .admin-layout { grid-template-columns: 1fr; }
-    .sidebar, .profile-sidebar, .admin-sidebar { position: static; }
+    .catalog-layout, .profile-layout, .admin-layout, .checkout-layout { grid-template-columns: 1fr; }
+    .sidebar, .profile-sidebar, .admin-sidebar, .checkout-sidebar { position: static; }
 }
 @media (max-width: 768px) {
     .header-content { flex-wrap: wrap; gap: 15px; }
