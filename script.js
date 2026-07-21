@@ -1023,7 +1023,13 @@ function initSellerPage() {
         avatar.innerHTML = seller.avatar ? `<img src="${seller.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : '<i class="fas fa-store"></i>';
     }
     if (bg) {
-        bg.style.background = seller.background ? `url(${seller.background}) center/cover` : 'var(--bg-tertiary)';
+        if (seller.background) {
+            bg.style.backgroundImage = `url(${seller.background})`;
+            bg.style.backgroundSize = 'cover';
+            bg.style.backgroundPosition = 'center';
+        } else {
+            bg.style.background = 'linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%)';
+        }
     }
 
     const products = getData('products').filter(p => p.sellerId === sellerId);
