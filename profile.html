@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Личный кабинет — Minecraft Маркетплейс</title>
+    <title>Личный кабинет — Ozon Minecraft</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -11,18 +11,13 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <a href="index.html" class="logo">
-                    <i class="fas fa-cube"></i>
-                    <span>Minecraft Маркет</span>
-                </a>
+                <a href="index.html" class="logo"><i class="fas fa-cube"></i><span>Ozon MC</span></a>
                 <nav class="nav">
                     <a href="index.html" class="nav-link">Главная</a>
                     <a href="catalog.html" class="nav-link">Каталог</a>
                 </nav>
                 <div class="header-actions">
-                    <button class="icon-btn" id="logoutBtn">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
+                    <button class="icon-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i></button>
                 </div>
             </div>
         </div>
@@ -30,9 +25,7 @@
 
     <div class="breadcrumbs">
         <div class="container">
-            <a href="index.html">Главная</a>
-            <span>›</span>
-            <span>Личный кабинет</span>
+            <a href="index.html">Главная</a><span>›</span><span>Личный кабинет</span>
         </div>
     </div>
 
@@ -41,32 +34,22 @@
             <div class="profile-layout">
                 <aside class="profile-sidebar">
                     <div class="profile-avatar">
-                        <div class="avatar-circle" id="userAvatar">
-                            <i class="fas fa-user"></i>
-                        </div>
+                        <div class="avatar-circle"><i class="fas fa-user"></i></div>
+                        <div class="user-name-display" id="sidebarUserName">Игрок</div>
                     </div>
                     <nav class="profile-nav">
-                        <a href="#profile" class="profile-nav-link active">
-                            <i class="fas fa-user"></i> Профиль
-                        </a>
-                        <a href="#delivery" class="profile-nav-link">
-                            <i class="fas fa-truck"></i> Настройки доставки
-                        </a>
-                        <a href="#seller" class="profile-nav-link">
-                            <i class="fas fa-store"></i> Мой магазин
-                        </a>
-                        <a href="#orders" class="profile-nav-link">
-                            <i class="fas fa-shopping-bag"></i> Заказы
-                        </a>
-                        <a href="#settings" class="profile-nav-link">
-                            <i class="fas fa-cog"></i> Настройки
-                        </a>
+                        <a href="#profile" class="profile-nav-link active"><i class="fas fa-user"></i> Профиль</a>
+                        <a href="#my-products" class="profile-nav-link"><i class="fas fa-box"></i> Мои товары</a>
+                        <a href="#add-product" class="profile-nav-link"><i class="fas fa-plus-circle"></i> Добавить товар</a>
+                        <a href="#delivery" class="profile-nav-link"><i class="fas fa-truck"></i> Доставка</a>
+                        <a href="#orders" class="profile-nav-link"><i class="fas fa-shopping-bag"></i> Заказы</a>
+                        <a href="#settings" class="profile-nav-link"><i class="fas fa-cog"></i> Настройки</a>
                     </nav>
                 </aside>
 
                 <div class="profile-content">
                     <section id="profile" class="profile-section active">
-                        <h1>Мой профиль</h1>
+                        <h1><i class="fas fa-user"></i> Мой профиль</h1>
                         <form id="profileForm" class="profile-form">
                             <div class="form-group">
                                 <label for="profileName">Имя</label>
@@ -84,19 +67,50 @@
                                 <label for="profileBio">О себе</label>
                                 <textarea id="profileBio" rows="4"></textarea>
                             </div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Сохранить изменения
-                            </button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Сохранить</button>
+                        </form>
+                    </section>
+
+                    <section id="my-products" class="profile-section">
+                        <h1><i class="fas fa-box"></i> Мои товары</h1>
+                        <div class="products-grid" id="myProductsGrid"></div>
+                    </section>
+
+                    <section id="add-product" class="profile-section">
+                        <h1><i class="fas fa-plus-circle"></i> Добавить товар</h1>
+                        <form id="addProductForm" class="profile-form">
+                            <div class="form-group">
+                                <label for="productTitle">Название предмета</label>
+                                <input type="text" id="productTitle" placeholder="Например: Алмазный меч" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="productCategory">Категория</label>
+                                <select id="productCategory" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="productPrice">Цена за 1 шт (₽)</label>
+                                <input type="number" id="productPrice" placeholder="0" min="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="productQuantity">Количество на складе (шт)</label>
+                                <input type="number" id="productQuantity" placeholder="0" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="productDescription">Описание</label>
+                                <textarea id="productDescription" rows="4" placeholder="Описание предмета"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="productDelivery">Информация о доставке</label>
+                                <input type="text" id="productDelivery" placeholder="Например: Отправка в течение 1 дня">
+                            </div>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Добавить товар</button>
                         </form>
                     </section>
 
                     <section id="delivery" class="profile-section">
-                        <h1>Настройки доставки</h1>
+                        <h1><i class="fas fa-truck"></i> Настройки доставки</h1>
                         <div class="delivery-settings">
-                            <p style="margin-bottom: 20px; color: var(--color-text-secondary);">
-                                Настройте способы доставки для вашего магазина. Покупатели смогут выбрать удобный вариант при оформлении заказа.
-                            </p>
-
+                            <p style="margin-bottom: 20px; color: var(--color-text-secondary);">Настройте способы доставки для вашего магазина.</p>
                             <form id="deliveryForm">
                                 <div class="delivery-method-card">
                                     <h3><i class="fas fa-truck"></i> Курьерская доставка</h3>
@@ -116,38 +130,23 @@
 
                                 <div class="delivery-method-card">
                                     <h3><i class="fas fa-map-marker-alt"></i> Пункты выдачи</h3>
-                                    <p style="font-size: 14px; color: var(--color-text-secondary); margin-bottom: 15px;">
-                                        Добавьте пункты выдачи (СДЭК, Почта России, Boxberry и т.д.)
-                                    </p>
+                                    <p style="font-size: 14px; color: var(--color-text-secondary); margin-bottom: 15px;">Добавьте пункты выдачи (СДЭК, Почта России, Boxberry)</p>
                                     <div id="pickupPointsContainer"></div>
-                                    <button type="button" class="btn btn-secondary" id="addPickupBtn">
-                                        <i class="fas fa-plus"></i> Добавить пункт выдачи
-                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="addPickupBtn"><i class="fas fa-plus"></i> Добавить пункт выдачи</button>
                                 </div>
 
-                                <button type="submit" class="btn btn-primary btn-full">
-                                    <i class="fas fa-save"></i> Сохранить настройки доставки
-                                </button>
+                                <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Сохранить настройки</button>
                             </form>
                         </div>
                     </section>
 
-                    <section id="seller" class="profile-section">
-                        <h1>Мой магазин</h1>
-                        <div id="sellerContent">
-                            <p>У вас ещё нет магазина</p>
-                        </div>
-                    </section>
-
                     <section id="orders" class="profile-section">
-                        <h1>Мои заказы</h1>
-                        <div id="ordersContent">
-                            <p>У вас пока нет заказов</p>
-                        </div>
+                        <h1><i class="fas fa-shopping-bag"></i> Мои заказы</h1>
+                        <div id="ordersContent"><p>У вас пока нет заказов</p></div>
                     </section>
 
                     <section id="settings" class="profile-section">
-                        <h1>Настройки</h1>
+                        <h1><i class="fas fa-cog"></i> Настройки</h1>
                         <form id="settingsForm" class="profile-form">
                             <div class="form-group">
                                 <label for="currentPassword">Текущий пароль</label>
@@ -161,9 +160,7 @@
                                 <label for="confirmPassword">Подтвердите новый пароль</label>
                                 <input type="password" id="confirmPassword">
                             </div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Изменить пароль
-                            </button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Изменить пароль</button>
                         </form>
                     </section>
                 </div>
