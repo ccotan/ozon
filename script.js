@@ -24,17 +24,6 @@ function getCurrentUser() {
     const u = localStorage.getItem('currentUser');
     return u === 'null' ? null : JSON.parse(u);
 }
-function refreshCurrentUser() {
-    const u = getCurrentUser();
-    if (!u) return null;
-    const users = getData('users');
-    const fresh = users.find(x => x.id === u.id);
-    if (fresh) {
-        localStorage.setItem('currentUser', JSON.stringify(fresh));
-        return fresh;
-    }
-    return null;
-}
 
 // ==================== АНИМАЦИИ ====================
 function initScrollAnimations() {
@@ -102,18 +91,23 @@ function renderProducts(containerId, products = []) {
             <div class="product-info">
                 <div class="product-category">${p.categoryName || ''}</div>
                 <div class="product-title">${p.title}</div>
-                <div class="product-price">${p.price.toLocaleString('ru-RU')} ₽</div>
+                <div class="product-price">${p.price.toLocaleString('ru-RU')} АР</div>
                 <div class="product-stock ${p.quantity > 0 ? '' : 'out'}">
                     <i class="fas ${p.quantity > 0 ? 'fa-check-circle' : 'fa-times-circle'}"></i>
                     ${p.quantity > 0 ? `В наличии: ${p.quantity} шт` : 'Нет в наличии'}
                 </div>
                 ${p.delivery ? `<div class="product-delivery"><i class="fas fa-truck"></i> ${p.delivery}</div>` : ''}
                 <div class="product-seller"><i class="fas fa-store"></i> ${p.sellerName || 'Неизвестно'}</div>
+                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                    ${getCurrentUser() && getCurrentUser().id !== p.sellerId && p.quantity > 0 ? 
+                        `<button class="btn btn-primary btn-small" onclick="event.stopPropagation(); buyProductDirect(${p.id})" style="flex: 1;"><i class="fas fa-bolt"></i> Купить</button>` : ''}
+                    ${getCurrentUser() && getCurrentUser().id !== p.sellerId ? 
+                        `<button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); contactAboutProduct(${p.id})" style="flex: 1;"><i class="fas fa-comment"></i> Написать</button>` : ''}
+                </div>
             </div>
         </div>
     `).join('');
 
-    // Клик по товару
     container.querySelectorAll('.product-card').forEach(card => {
         card.addEventListener('click', () => {
             const id = parseInt(card.dataset.id);
@@ -123,6 +117,52 @@ function renderProducts(containerId, products = []) {
         });
     });
 }
+
+window.buyProductDirect = function(productId) {
+    const products = getData('products');
+    const product = products.find(p => p.id === productId);
+    if (product) buyProduct(product);
+};
+
+window.contactAboutProduct = function(productId) {
+    const products = getData('products');
+    const product = products.find(p => p.id === productId);
+    if (product) {
+        const user = getCurrentUser();
+        if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
+        
+        const chats = getData('chats');
+        const existingChat = chats.find(c => 
+            (c.buyerId === user.id && c.sellerId === product.sellerId && c.productId === productId) ||
+            (c.sellerId === user.id && c.buyerId === product.sellerId && c.productId === productId)
+        );
+        
+        if (existingChat) {
+            window.location.href = `chat.html?chatId=${existingChat.id}`;
+        } else {
+            const chat = {
+                id: Date.now(),
+                orderId: null,
+                buyerId: user.id,
+                sellerId: product.sellerId,
+                productId: product.id,
+                productTitle: product.title,
+                productImage: product.image || null,
+                productIcon: product.icon || 'fa-cube',
+                productPrice: product.price,
+                messages: [{
+                    id: 1,
+                    userId: user.id,
+                    text: `Здравствуйте! Интересует "${product.title}". Есть вопросы по товару.`,
+                    time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                }]
+            };
+            chats.push(chat);
+            setData('chats', chats);
+            window.location.href = `chat.html?chatId=${chat.id}`;
+        }
+    }
+};
 
 // ==================== МОДАЛКА ТОВАРА ====================
 function showProductModal(product) {
@@ -147,13 +187,14 @@ function showProductModal(product) {
                     <span class="badge badge-admin">${product.categoryName || ''}</span>
                     <span class="product-stock ${product.quantity > 0 ? '' : 'out'}" style="margin: 0;"><i class="fas ${product.quantity > 0 ? 'fa-check-circle' : 'fa-times-circle'}"></i> ${product.quantity > 0 ? `В наличии: ${product.quantity} шт` : 'Нет в наличии'}</span>
                 </div>
-                <div style="font-size: 36px; font-weight: 800; color: var(--color-lime); margin-bottom: 20px;">${product.price.toLocaleString('ru-RU')} ₽</div>
+                <div style="font-size: 36px; font-weight: 800; color: var(--color-lime); margin-bottom: 20px;">${product.price.toLocaleString('ru-RU')} АР</div>
                 ${product.description ? `<p style="color: var(--color-text-secondary); margin-bottom: 20px; line-height: 1.6;">${product.description}</p>` : ''}
                 ${product.delivery ? `<p style="color: var(--color-text-secondary); margin-bottom: 20px;"><i class="fas fa-truck" style="color: var(--color-lime);"></i> ${product.delivery}</p>` : ''}
                 <p style="color: var(--color-text-muted); margin-bottom: 20px;"><i class="fas fa-store"></i> Продавец: ${product.sellerName || 'Неизвестно'}</p>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     ${user && user.id !== product.sellerId && product.quantity > 0 ? `<button class="btn btn-primary" id="buyNowBtn"><i class="fas fa-bolt"></i> Купить сейчас</button>` : ''}
                     ${user && user.id !== product.sellerId && product.quantity > 0 ? `<button class="btn btn-secondary" id="addToCartBtn"><i class="fas fa-cart-plus"></i> В корзину</button>` : ''}
+                    ${user && user.id !== product.sellerId ? `<button class="btn btn-secondary" id="contactBtn"><i class="fas fa-comment"></i> Написать по поводу товара</button>` : ''}
                     ${user && user.id !== product.sellerId ? `<button class="btn btn-danger" id="reportProductBtn"><i class="fas fa-flag"></i> Пожаловаться</button>` : ''}
                     ${user && user.id === product.sellerId ? `<button class="btn btn-danger" id="deleteMyProductBtn"><i class="fas fa-trash"></i> Удалить товар</button>` : ''}
                 </div>
@@ -167,17 +208,19 @@ function showProductModal(product) {
 
     const buyNowBtn = document.getElementById('buyNowBtn');
     if (buyNowBtn) {
-        buyNowBtn.onclick = () => {
-            modal.remove();
-            buyProduct(product);
-        };
+        buyNowBtn.onclick = () => { modal.remove(); buyProduct(product); };
     }
 
     const addToCartBtn = document.getElementById('addToCartBtn');
     if (addToCartBtn) {
-        addToCartBtn.onclick = () => {
-            addToCart(product);
+        addToCartBtn.onclick = () => { addToCart(product); modal.remove(); };
+    }
+
+    const contactBtn = document.getElementById('contactBtn');
+    if (contactBtn) {
+        contactBtn.onclick = () => {
             modal.remove();
+            contactAboutProduct(product.id);
         };
     }
 
@@ -237,7 +280,6 @@ function buyProduct(product) {
     orders.push(order);
     setData('orders', orders);
 
-    // Создаём чат
     const chats = getData('chats');
     const chat = {
         id: Date.now(),
@@ -312,7 +354,7 @@ function initCart() {
                 <div class="cart-item-image">${p.image ? `<img src="${p.image}">` : `<i class="fas ${p.icon || 'fa-cube'}"></i>`}</div>
                 <div class="cart-item-info">
                     <div class="cart-item-title">${p.title}</div>
-                    <div class="cart-item-price">${p.price.toLocaleString('ru-RU')} ₽ × ${item.quantity} = ${subtotal.toLocaleString('ru-RU')} ₽</div>
+                    <div class="cart-item-price">${p.price.toLocaleString('ru-RU')} АР × ${item.quantity} = ${subtotal.toLocaleString('ru-RU')} АР</div>
                     <div style="font-size: 12px; color: var(--color-text-muted);">Продавец: ${p.sellerName}</div>
                 </div>
                 <div class="cart-item-controls">
@@ -327,7 +369,7 @@ function initCart() {
         `;
     }).join('');
 
-    cartTotal.textContent = total.toLocaleString('ru-RU') + ' ₽';
+    cartTotal.textContent = total.toLocaleString('ru-RU') + ' АР';
     cartSummary.style.display = 'flex';
 
     if (checkoutBtn) {
@@ -428,7 +470,7 @@ function checkoutCart() {
     setData('chats', chats);
     setData('cart', []);
 
-    alert(`Заказ оформлен! Сумма: ${total.toLocaleString('ru-RU')} ₽`);
+    alert(`Заказ оформлен! Сумма: ${total.toLocaleString('ru-RU')} АР`);
     updateHeader();
     window.location.href = `chat.html?chatId=${newChats[0].id}`;
 }
@@ -544,7 +586,6 @@ function initProfile() {
     renderSales(user);
     renderPurchases(user);
 
-    // Профиль форма
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
         profileForm.addEventListener('submit', (e) => {
@@ -565,7 +606,6 @@ function initProfile() {
         });
     }
 
-    // Аватар и фон
     const avatarInput = document.getElementById('avatarInput');
     const bgInput = document.getElementById('bgInput');
     const previewAvatar = document.getElementById('previewAvatar');
@@ -637,7 +677,6 @@ function initProfile() {
         };
     }
 
-    // Добавление товара с изображением
     const addProductForm = document.getElementById('addProductForm');
     if (addProductForm) {
         const categorySelect = document.getElementById('productCategory');
@@ -700,7 +739,6 @@ function initProfile() {
         });
     }
 
-    // Доставка
     loadDeliverySettings(user);
     const deliveryForm = document.getElementById('deliveryForm');
     if (deliveryForm) {
@@ -750,13 +788,12 @@ function initProfile() {
                 </div>
                 <div class="form-group"><label>Название пункта</label><input type="text" class="pickup-name" placeholder="СДЭК, Почта России" required></div>
                 <div class="form-group"><label>Адрес</label><input type="text" class="pickup-address" placeholder="ул. Примерная, д. 1" required></div>
-                <div class="form-group"><label>Стоимость (₽)</label><input type="number" class="pickup-price" placeholder="0" min="0" step="10"></div>
+                <div class="form-group"><label>Стоимость (АР)</label><input type="number" class="pickup-price" placeholder="0" min="0" step="10"></div>
             `;
             container.appendChild(point);
         });
     }
 
-    // Смена пароля
     const settingsForm = document.getElementById('settingsForm');
     if (settingsForm) {
         settingsForm.addEventListener('submit', (e) => {
@@ -815,7 +852,7 @@ function renderSales(user) {
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                 <div>
                     <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
-                    <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} ₽</div>
+                    <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
                 </div>
                 <div style="display: flex; gap: 10px;">
                     ${o.status === 'pending' ? `<button class="btn btn-success" onclick="confirmSale(${o.id})"><i class="fas fa-check"></i> Подтвердить продажу</button>` : ''}
@@ -835,13 +872,11 @@ window.confirmSale = function(orderId) {
     order.status = 'confirmed';
     setData('orders', orders);
 
-    // Уменьшаем количество товара
     const products = getData('products');
     const product = products.find(p => p.id === order.productId);
     if (product) {
         product.quantity -= order.quantity;
         if (product.quantity <= 0) {
-            // Удаляем товар если 0
             const idx = products.indexOf(product);
             products.splice(idx, 1);
         }
@@ -881,7 +916,7 @@ function renderPurchases(user) {
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                 <div>
                     <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
-                    <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} ₽</div>
+                    <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
                 </div>
                 <button class="btn btn-secondary" onclick="openChatByOrder(${o.id})"><i class="fas fa-comments"></i> Чат с продавцом</button>
             </div>
@@ -917,7 +952,7 @@ function loadDeliverySettings(user) {
                 </div>
                 <div class="form-group"><label>Название</label><input type="text" class="pickup-name" value="${point.name}" required></div>
                 <div class="form-group"><label>Адрес</label><input type="text" class="pickup-address" value="${point.address}" required></div>
-                <div class="form-group"><label>Стоимость (₽)</label><input type="number" class="pickup-price" value="${point.price}" min="0" step="10"></div>
+                <div class="form-group"><label>Стоимость (АР)</label><input type="number" class="pickup-price" value="${point.price}" min="0" step="10"></div>
             `;
             container.appendChild(div);
         });
@@ -1071,7 +1106,7 @@ function initChat() {
             imgEl.innerHTML = chat.productImage ? `<img src="${chat.productImage}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas ${chat.productIcon || 'fa-cube'}"></i>`;
         }
         if (titleEl) titleEl.textContent = chat.productTitle;
-        if (priceEl) priceEl.textContent = `${chat.productPrice.toLocaleString('ru-RU')} ₽`;
+        if (priceEl) priceEl.textContent = `${chat.productPrice.toLocaleString('ru-RU')} АР`;
     }
 
     function renderMessages() {
@@ -1166,7 +1201,7 @@ function initAdmin() {
             <tr>
                 <td>${p.id}</td>
                 <td>${p.title}</td>
-                <td>${p.price.toLocaleString('ru-RU')} ₽</td>
+                <td>${p.price.toLocaleString('ru-RU')} АР</td>
                 <td>${p.categoryName || p.category}</td>
                 <td>${p.quantity} шт</td>
                 <td>${p.sellerName || '-'}</td>
@@ -1220,7 +1255,7 @@ function initAdmin() {
                         </div>
                         <span class="order-status ${o.status}">${o.status}</span>
                     </div>
-                    <div>Количество: ${o.quantity} шт • Сумма: ${o.total.toLocaleString('ru-RU')} ₽</div>
+                    <div>Количество: ${o.quantity} шт • Сумма: ${o.total.toLocaleString('ru-RU')} АР</div>
                 </div>
             `).join('');
         }
@@ -1269,7 +1304,6 @@ window.adminResolveReport = function(id, action) {
     initAdmin();
 };
 
-// ==================== ПОИСК В ШАПКЕ ====================
 function doHeaderSearch() {
     const searchInput = document.getElementById('headerSearch');
     if (!searchInput) return;
@@ -1277,7 +1311,6 @@ function doHeaderSearch() {
     if (query) window.location.href = `catalog.html?search=${encodeURIComponent(query)}`;
 }
 
-// ==================== ВЫХОД ====================
 function initLogout() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -1288,7 +1321,6 @@ function initLogout() {
     }
 }
 
-// ==================== ЗАПУСК ====================
 document.addEventListener('DOMContentLoaded', () => {
     initData();
     updateHeader();
