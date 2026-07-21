@@ -1092,4 +1092,225 @@ function initChat() {
         if (!text) return;
 
         const currentChats = getData('chats');
-        const currentChat = currentChats.find(c => c.id === chat
+        const currentChat = currentChats.find(c => c.id === chatId);
+        if (!currentChat) return;
+
+        currentChat.messages.push({
+            id: Date.now(),
+            userId: user.id,
+            text,
+            time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        });
+        setData('chats', currentChats);
+        input.value = '';
+        renderMessages();
+    }
+
+    if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+    if (input) input.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+    const reportChatBtn = document.getElementById('reportChatBtn');
+    if (reportChatBtn) {
+        reportChatBtn.onclick = () => {
+            const otherUserId = chat.buyerId === user.id ? chat.sellerId : chat.buyerId;
+            const reason = prompt('Причина жалобы:');
+            if (reason && reason.trim()) {
+                submitReport('user', otherUserId, otherUserId, reason.trim());
+                alert('Жалоба отправлена');
+            }
+        };
+    }
+
+    renderMessages();
+}
+
+// ==================== АДМИНКА ====================
+function initAdmin() {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') { window.location.href = 'index.html'; return; }
+
+    const navLinks = document.querySelectorAll('.admin-nav-link');
+    const sections = document.querySelectorAll('.admin-section');
+
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = link.getAttribute('href').substring(1);
+            navLinks.forEach(l => l.classList.remove('active'));
+            sections.forEach(s => s.classList.remove('active'));
+            link.classList.add('active');
+            document.getElementById(target)?.classList.add('active');
+        });
+    });
+
+    const usersBody = document.getElementById('usersTableBody');
+    if (usersBody) {
+        const users = getData('users');
+        usersBody.innerHTML = users.map(u => `
+            <tr>
+                <td>${u.id}</td>
+                <td>${u.name}</td>
+                <td>${u.email}</td>
+                <td><span class="badge badge-${u.role || 'user'}">${u.role || 'user'}</span></td>
+                <td>
+                    ${u.role !== 'admin' ? `<button class="btn btn-danger btn-small" onclick="adminDeleteUser(${u.id})"><i class="fas fa-trash"></i></button>` : '-'}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    const productsBody = document.getElementById('productsTableBody');
+    if (productsBody) {
+        const products = getData('products');
+        productsBody.innerHTML = products.map(p => `
+            <tr>
+                <td>${p.id}</td>
+                <td>${p.title}</td>
+                <td>${p.price.toLocaleString('ru-RU')} ₽</td>
+                <td>${p.categoryName || p.category}</td>
+                <td>${p.quantity} шт</td>
+                <td>${p.sellerName || '-'}</td>
+                <td><button class="btn btn-danger btn-small" onclick="adminDeleteProduct(${p.id})"><i class="fas fa-trash"></i></button></td>
+            </tr>
+        `).join('');
+    }
+
+    const reportsContent = document.getElementById('reportsContent');
+    if (reportsContent) {
+        const reports = getData('reports');
+        if (reports.length === 0) {
+            reportsContent.innerHTML = '<div class="empty-state"><i class="fas fa-flag"></i><p>Жалоб нет</p></div>';
+        } else {
+            reportsContent.innerHTML = reports.map(r => {
+                const reported = getData('users').find(u => u.id === r.reportedUserId);
+                return `
+                    <div class="report-card">
+                        <div class="report-header">
+                            <div>
+                                <div style="font-weight: 700;">Жалоба на: ${reported?.name || 'Неизвестно'} (${r.type})</div>
+                                <div style="font-size: 13px; color: var(--color-text-muted);">От: ${r.reporterName} • ${new Date(r.createdAt).toLocaleString('ru-RU')}</div>
+                            </div>
+                            <span class="report-type">${r.type === 'product' ? 'Товар' : r.type === 'seller' ? 'Продавец' : 'Пользователь'}</span>
+                        </div>
+                        <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-card); border-radius: var(--radius-xs); border-left: 3px solid var(--color-danger);">
+                            <strong>Причина:</strong> ${r.reason}
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-danger btn-small" onclick="adminResolveReport(${r.id}, 'ban')"><i class="fas fa-ban"></i> Забанить</button>
+                            <button class="btn btn-secondary btn-small" onclick="adminResolveReport(${r.id}, 'dismiss')"><i class="fas fa-times"></i> Отклонить</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    const adminOrdersContent = document.getElementById('adminOrdersContent');
+    if (adminOrdersContent) {
+        const orders = getData('orders');
+        if (orders.length === 0) {
+            adminOrdersContent.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-bag"></i><p>Заказов нет</p></div>';
+        } else {
+            adminOrdersContent.innerHTML = orders.map(o => `
+                <div class="order-card">
+                    <div class="order-header">
+                        <div>
+                            <div style="font-weight: 700;">${o.productTitle}</div>
+                            <div style="font-size: 13px; color: var(--color-text-muted);">Покупатель: ${o.buyerName} • Продавец: ${o.sellerName}</div>
+                        </div>
+                        <span class="order-status ${o.status}">${o.status}</span>
+                    </div>
+                    <div>Количество: ${o.quantity} шт • Сумма: ${o.total.toLocaleString('ru-RU')} ₽</div>
+                </div>
+            `).join('');
+        }
+    }
+
+    const logoutBtn = document.getElementById('adminLogoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            localStorage.setItem('currentUser', 'null');
+            window.location.href = 'index.html';
+        });
+    }
+}
+
+window.adminDeleteUser = function(id) {
+    if (!confirm('Удалить пользователя?')) return;
+    const users = getData('users').filter(u => u.id !== id);
+    setData('users', users);
+    initAdmin();
+};
+
+window.adminDeleteProduct = function(id) {
+    if (!confirm('Удалить товар?')) return;
+    const products = getData('products').filter(p => p.id !== id);
+    setData('products', products);
+    initAdmin();
+};
+
+window.adminResolveReport = function(id, action) {
+    const reports = getData('reports');
+    const report = reports.find(r => r.id === id);
+    if (!report) return;
+
+    if (action === 'ban') {
+        const users = getData('users');
+        const idx = users.findIndex(u => u.id === report.reportedUserId);
+        if (idx !== -1) {
+            users.splice(idx, 1);
+            setData('users', users);
+            alert('Пользователь забанен (удалён)');
+        }
+    }
+
+    report.status = action;
+    setData('reports', reports.filter(r => r.id !== id));
+    initAdmin();
+};
+
+// ==================== ПОИСК В ШАПКЕ ====================
+function doHeaderSearch() {
+    const searchInput = document.getElementById('headerSearch');
+    if (!searchInput) return;
+    const query = searchInput.value.trim();
+    if (query) window.location.href = `catalog.html?search=${encodeURIComponent(query)}`;
+}
+
+// ==================== ВЫХОД ====================
+function initLogout() {
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            localStorage.setItem('currentUser', 'null');
+            window.location.href = 'index.html';
+        });
+    }
+}
+
+// ==================== ЗАПУСК ====================
+document.addEventListener('DOMContentLoaded', () => {
+    initData();
+    updateHeader();
+    initScrollAnimations();
+    initLogout();
+
+    if (document.getElementById('categoriesGrid')) renderCategories('categoriesGrid');
+    if (document.getElementById('productsGrid') && document.getElementById('searchInput')) initCatalog();
+    if (document.getElementById('productsGrid') && !document.getElementById('searchInput') && !document.getElementById('sellerProductsGrid') && !document.getElementById('myProductsGrid')) {
+        const products = getData('products').filter(p => p.quantity > 0).slice(0, 8);
+        renderProducts('productsGrid', products);
+    }
+
+    if (document.querySelector('.profile-layout')) {
+        const user = getCurrentUser();
+        if (!user) window.location.href = 'login.html';
+        else initProfile();
+    }
+
+    if (document.querySelector('.admin-layout')) initAdmin();
+    if (document.querySelector('.chat-container')) initChat();
+    if (document.getElementById('sellersGrid')) initSellers();
+    if (document.getElementById('sellerProductsGrid')) initSellerPage();
+    if (document.getElementById('cartItems')) initCart();
+});
