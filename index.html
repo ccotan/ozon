@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Маркетплейс</title>
+    <title>Ozon Minecraft — Маркетплейс</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -13,22 +13,20 @@
             <div class="header-content">
                 <a href="index.html" class="logo">
                     <i class="fas fa-cube"></i>
-                    <span>Minecraft Маркет</span>
+                    <span>Ozon MC</span>
                 </a>
+                <div class="search-header">
+                    <input type="text" id="headerSearch" placeholder="Поиск предметов Minecraft...">
+                    <button class="search-btn"><i class="fas fa-search"></i></button>
+                </div>
                 <nav class="nav">
-                    <a href="index.html" class="nav-link active">Главная</a>
-                    <a href="catalog.html" class="nav-link">Каталог</a>
+                    <a href="catalog.html" class="nav-link"><i class="fas fa-th"></i> Каталог</a>
+                    <a href="sellers.html" class="nav-link"><i class="fas fa-store"></i> Продавцы</a>
                 </nav>
                 <div class="header-actions">
-                    <a href="login.html" class="btn btn-primary" id="loginBtn">
-                        <i class="fas fa-user"></i> Войти
-                    </a>
-                    <a href="profile.html" class="btn btn-primary hidden" id="profileBtn">
-                        <i class="fas fa-user-circle"></i> <span id="userName">Профиль</span>
-                    </a>
-                    <button class="icon-btn hidden" id="logoutBtn">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
+                    <a href="login.html" class="btn btn-primary" id="loginBtn"><i class="fas fa-user"></i> Войти</a>
+                    <a href="profile.html" class="btn btn-primary hidden" id="profileBtn"><i class="fas fa-user-circle"></i> <span id="userName">Профиль</span></a>
+                    <button class="icon-btn hidden" id="logoutBtn" title="Выйти"><i class="fas fa-sign-out-alt"></i></button>
                 </div>
             </div>
         </div>
@@ -43,7 +41,7 @@
     <main class="main">
         <div class="container">
             <section class="hero animate-on-scroll">
-                <h1>Minecraft Маркетплейс</h1>
+                <h1>Ozon Minecraft</h1>
                 <p>Покупай и продавай предметы, блоки и ресурсы Minecraft</p>
                 <a href="catalog.html" class="btn btn-large">Перейти в каталог</a>
             </section>
@@ -62,7 +60,7 @@
 
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2026 Minecraft Маркетплейс. Все права защищены.</p>
+            <p>&copy; 2026 Ozon Minecraft. Все права защищены.</p>
         </div>
     </footer>
 
