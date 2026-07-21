@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Личный кабинет — Маркетплейс</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="index.html" class="logo">
+                    <i class="fas fa-store"></i>
+                    <span>Маркетплейс</span>
+                </a>
+                <nav class="nav">
+                    <a href="index.html" class="nav-link">Главная</a>
+                    <a href="catalog.html" class="nav-link">Каталог</a>
+                </nav>
+                <div class="header-actions">
+                    <button class="icon-btn" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="breadcrumbs">
+        <div class="container">
+            <a href="index.html">Главная</a>
+            <span>›</span>
+            <span>Личный кабинет</span>
+        </div>
+    </div>
+
+    <main class="main">
+        <div class="container">
+            <div class="profile-layout">
+                <aside class="profile-sidebar">
+                    <div class="profile-avatar">
+                        <div class="avatar-circle" id="userAvatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                    </div>
+                    <nav class="profile-nav">
+                        <a href="#profile" class="profile-nav-link active">
+                            <i class="fas fa-user"></i> Профиль
+                        </a>
+                        <a href="#seller" class="profile-nav-link">
+                            <i class="fas fa-store"></i> Мой магазин
+                        </a>
+                        <a href="#orders" class="profile-nav-link">
+                            <i class="fas fa-shopping-bag"></i> Заказы
+                        </a>
+                        <a href="#settings" class="profile-nav-link">
+                            <i class="fas fa-cog"></i> Настройки
+                        </a>
+                    </nav>
+                </aside>
+
+                <div class="profile-content">
+                    <section id="profile" class="profile-section active">
+                        <h1>Мой профиль</h1>
+                        <form id="profileForm" class="profile-form">
+                            <div class="form-group">
+                                <label for="profileName">Имя</label>
+                                <input type="text" id="profileName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="profileEmail">Email</label>
+                                <input type="email" id="profileEmail" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="profilePhone">Телефон</label>
+                                <input type="tel" id="profilePhone">
+                            </div>
+                            <div class="form-group">
+                                <label for="profileBio">О себе</label>
+                                <textarea id="profileBio" rows="4"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Сохранить изменения
+                            </button>
+                        </form>
+                    </section>
+
+                    <section id="seller" class="profile-section">
+                        <h1>Мой магазин</h1>
+                        <div id="sellerContent">
+                            <p>У вас ещё нет магазина</p>
+                        </div>
+                    </section>
+
+                    <section id="orders" class="profile-section">
+                        <h1>Мои заказы</h1>
+                        <div id="ordersContent">
+                            <p>У вас пока нет заказов</p>
+                        </div>
+                    </section>
+
+                    <section id="settings" class="profile-section">
+                        <h1>Настройки</h1>
+                        <form id="settingsForm" class="profile-form">
+                            <div class="form-group">
+                                <label for="currentPassword">Текущий пароль</label>
+                                <input type="password" id="currentPassword">
+                            </div>
+                            <div class="form-group">
+                                <label for="newPassword">Новый пароль</label>
+                                <input type="password" id="newPassword">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirmPassword">Подтвердите новый пароль</label>
+                                <input type="password" id="confirmPassword">
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Изменить пароль
+                            </button>
+                        </form>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
