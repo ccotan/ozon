@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Магазин продавца — Маркетплейс</title>
+    <title>Продавцы — Ozon Minecraft</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -11,56 +11,36 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <a href="index.html" class="logo">
-                    <i class="fas fa-store"></i>
-                    <span>Маркетплейс</span>
-                </a>
+                <a href="index.html" class="logo"><i class="fas fa-cube"></i><span>Ozon MC</span></a>
                 <nav class="nav">
                     <a href="index.html" class="nav-link">Главная</a>
                     <a href="catalog.html" class="nav-link">Каталог</a>
+                    <a href="sellers.html" class="nav-link active">Продавцы</a>
                 </nav>
+                <div class="header-actions">
+                    <a href="login.html" class="btn btn-primary" id="loginBtn"><i class="fas fa-user"></i> Войти</a>
+                    <a href="profile.html" class="btn btn-primary hidden" id="profileBtn"><i class="fas fa-user-circle"></i> <span id="userName">Профиль</span></a>
+                    <button class="icon-btn hidden" id="logoutBtn"><i class="fas fa-sign-out-alt"></i></button>
+                </div>
             </div>
         </div>
     </header>
 
     <div class="breadcrumbs">
         <div class="container">
-            <a href="index.html">Главная</a>
-            <span>›</span>
-            <a href="sellers.html">Продавцы</a>
-            <span>›</span>
-            <span id="sellerName">Магазин</span>
+            <a href="index.html">Главная</a><span>›</span><span>Продавцы</span>
         </div>
     </div>
 
     <main class="main">
         <div class="container">
-            <div class="seller-header animate-on-scroll">
-                <div class="seller-info">
-                    <div class="seller-avatar">
-                        <i class="fas fa-store"></i>
-                    </div>
-                    <div class="seller-details">
-                        <h1 id="sellerTitle">Название магазина</h1>
-                        <p id="sellerDescription">Описание магазина</p>
-                        <div class="seller-stats">
-                            <span><i class="fas fa-box"></i> <span id="sellerProductsCount">0</span> товаров</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <section class="seller-products animate-on-scroll">
-                <h2>Товары продавца</h2>
-                <div class="products-grid" id="sellerProductsGrid"></div>
-            </section>
+            <h1 style="font-size: 32px; margin-bottom: 30px;"><i class="fas fa-store"></i> Продавцы</h1>
+            <div class="sellers-grid" id="sellersGrid"></div>
         </div>
     </main>
 
     <footer class="footer">
-        <div class="container">
-            <p>&copy; 2026 Маркетплейс. Все права защищены.</p>
-        </div>
+        <div class="container"><p>&copy; 2026 Ozon Minecraft</p></div>
     </footer>
 
     <script src="script.js"></script>
