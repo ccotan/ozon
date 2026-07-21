@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Каталог — Маркетплейс</title>
+    <title>Каталог — Ozon Minecraft</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -11,25 +11,19 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <a href="index.html" class="logo">
-                    <i class="fas fa-store"></i>
-                    <span>Маркетплейс</span>
-                </a>
+                <a href="index.html" class="logo"><i class="fas fa-cube"></i><span>Ozon MC</span></a>
+                <div class="search-header">
+                    <input type="text" id="headerSearch" placeholder="Поиск предметов Minecraft...">
+                    <button class="search-btn"><i class="fas fa-search"></i></button>
+                </div>
                 <nav class="nav">
-                    <a href="index.html" class="nav-link">Главная</a>
-                    <a href="catalog.html" class="nav-link active">Каталог</a>
-                    <a href="sellers.html" class="nav-link">Продавцы</a>
+                    <a href="catalog.html" class="nav-link active"><i class="fas fa-th"></i> Каталог</a>
+                    <a href="sellers.html" class="nav-link"><i class="fas fa-store"></i> Продавцы</a>
                 </nav>
                 <div class="header-actions">
-                    <a href="login.html" class="btn btn-primary" id="loginBtn">
-                        <i class="fas fa-user"></i> Войти
-                    </a>
-                    <a href="profile.html" class="btn btn-primary hidden" id="profileBtn">
-                        <i class="fas fa-user-circle"></i> <span id="userName">Профиль</span>
-                    </a>
-                    <button class="icon-btn hidden" id="logoutBtn">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
+                    <a href="login.html" class="btn btn-primary" id="loginBtn"><i class="fas fa-user"></i> Войти</a>
+                    <a href="profile.html" class="btn btn-primary hidden" id="profileBtn"><i class="fas fa-user-circle"></i> <span id="userName">Профиль</span></a>
+                    <button class="icon-btn hidden" id="logoutBtn"><i class="fas fa-sign-out-alt"></i></button>
                 </div>
             </div>
         </div>
@@ -37,9 +31,7 @@
 
     <div class="breadcrumbs">
         <div class="container">
-            <a href="index.html">Главная</a>
-            <span>›</span>
-            <span>Каталог</span>
+            <a href="index.html">Главная</a><span>›</span><span>Каталог</span>
         </div>
     </div>
 
@@ -52,19 +44,24 @@
                         <i class="fas fa-search search-icon"></i>
                     </div>
                     <div class="filter-section">
-                        <h3>Категории</h3>
+                        <h3><i class="fas fa-tags"></i> Категории</h3>
                         <div class="category-filters" id="categoryFilters"></div>
                     </div>
                     <div class="filter-section">
-                        <h3>Цена</h3>
+                        <h3><i class="fas fa-ruble-sign"></i> Цена</h3>
                         <div class="price-range">
                             <input type="number" id="minPrice" placeholder="От" class="price-input">
                             <input type="number" id="maxPrice" placeholder="До" class="price-input">
                         </div>
                     </div>
-                    <button class="btn btn-primary btn-full" id="applyFilters">
-                        <i class="fas fa-filter"></i> Применить фильтры
-                    </button>
+                    <div class="filter-section">
+                        <h3><i class="fas fa-box"></i> Наличие</h3>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="inStockOnly">
+                            <span>Только в наличии</span>
+                        </label>
+                    </div>
+                    <button class="btn btn-primary btn-full" id="applyFilters"><i class="fas fa-filter"></i> Применить</button>
                 </aside>
 
                 <div class="catalog-content">
@@ -84,9 +81,7 @@
     </main>
 
     <footer class="footer">
-        <div class="container">
-            <p>&copy; 2026 Маркетплейс. Все права защищены.</p>
-        </div>
+        <div class="container"><p>&copy; 2026 Ozon Minecraft</p></div>
     </footer>
 
     <script src="script.js"></script>
