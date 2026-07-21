@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Личный кабинет — Маркетплейс</title>
+    <title>Личный кабинет — Minecraft Маркетплейс</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -12,8 +12,8 @@
         <div class="container">
             <div class="header-content">
                 <a href="index.html" class="logo">
-                    <i class="fas fa-store"></i>
-                    <span>Маркетплейс</span>
+                    <i class="fas fa-cube"></i>
+                    <span>Minecraft Маркет</span>
                 </a>
                 <nav class="nav">
                     <a href="index.html" class="nav-link">Главная</a>
@@ -48,6 +48,9 @@
                     <nav class="profile-nav">
                         <a href="#profile" class="profile-nav-link active">
                             <i class="fas fa-user"></i> Профиль
+                        </a>
+                        <a href="#delivery" class="profile-nav-link">
+                            <i class="fas fa-truck"></i> Настройки доставки
                         </a>
                         <a href="#seller" class="profile-nav-link">
                             <i class="fas fa-store"></i> Мой магазин
@@ -85,6 +88,48 @@
                                 <i class="fas fa-save"></i> Сохранить изменения
                             </button>
                         </form>
+                    </section>
+
+                    <section id="delivery" class="profile-section">
+                        <h1>Настройки доставки</h1>
+                        <div class="delivery-settings">
+                            <p style="margin-bottom: 20px; color: var(--color-text-secondary);">
+                                Настройте способы доставки для вашего магазина. Покупатели смогут выбрать удобный вариант при оформлении заказа.
+                            </p>
+
+                            <form id="deliveryForm">
+                                <div class="delivery-method-card">
+                                    <h3><i class="fas fa-truck"></i> Курьерская доставка</h3>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="courierEnabled">
+                                        <span>Включить курьерскую доставку</span>
+                                    </label>
+                                    <div class="form-group" style="margin-top: 15px;">
+                                        <label>Стоимость доставки (₽)</label>
+                                        <input type="number" id="courierPrice" placeholder="0" min="0" step="10">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Срок доставки</label>
+                                        <input type="text" id="courierTime" placeholder="Например: 1-3 дня">
+                                    </div>
+                                </div>
+
+                                <div class="delivery-method-card">
+                                    <h3><i class="fas fa-map-marker-alt"></i> Пункты выдачи</h3>
+                                    <p style="font-size: 14px; color: var(--color-text-secondary); margin-bottom: 15px;">
+                                        Добавьте пункты выдачи (СДЭК, Почта России, Boxberry и т.д.)
+                                    </p>
+                                    <div id="pickupPointsContainer"></div>
+                                    <button type="button" class="btn btn-secondary" id="addPickupBtn">
+                                        <i class="fas fa-plus"></i> Добавить пункт выдачи
+                                    </button>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-full">
+                                    <i class="fas fa-save"></i> Сохранить настройки доставки
+                                </button>
+                            </form>
+                        </div>
                     </section>
 
                     <section id="seller" class="profile-section">
