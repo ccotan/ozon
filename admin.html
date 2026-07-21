@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Админ-панель — Маркетплейс</title>
+    <title>Админ-панель — Minecraft Маркетплейс</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -43,6 +43,9 @@
                         <a href="#products" class="admin-nav-link">
                             <i class="fas fa-box"></i> Товары
                         </a>
+                        <a href="#add-product" class="admin-nav-link">
+                            <i class="fas fa-plus"></i> Добавить товар
+                        </a>
                     </nav>
                 </aside>
 
@@ -78,11 +81,47 @@
                                         <th>Название</th>
                                         <th>Цена</th>
                                         <th>Категория</th>
+                                        <th>Продавец</th>
                                     </tr>
                                 </thead>
                                 <tbody id="productsTableBody"></tbody>
                             </table>
                         </div>
+                    </section>
+
+                    <section id="add-product" class="admin-section">
+                        <div class="section-header">
+                            <h1>Добавить товар</h1>
+                        </div>
+                        <form id="addProductForm" class="profile-form">
+                            <div class="form-group">
+                                <label for="productTitle">Название товара</label>
+                                <input type="text" id="productTitle" placeholder="Например: Алмазный меч" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="productPrice">Цена (₽)</label>
+                                <input type="number" id="productPrice" placeholder="0" min="0" step="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="productCategory">Категория</label>
+                                <select id="productCategory" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="productDescription">Описание</label>
+                                <textarea id="productDescription" rows="4" placeholder="Описание товара"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="productQuantity">Количество на складе</label>
+                                <input type="number" id="productQuantity" placeholder="0" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="productDelivery">Информация о доставке</label>
+                                <input type="text" id="productDelivery" placeholder="Например: Отправка в течение 1 дня">
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Добавить товар
+                            </button>
+                        </form>
                     </section>
                 </div>
             </div>
