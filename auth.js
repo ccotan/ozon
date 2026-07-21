@@ -1,28 +1,15 @@
-// ==================== УТИЛИТЫ ====================
-function getUsers() {
-    return JSON.parse(localStorage.getItem('users') || '[]');
-}
-
-function setUsers(users) {
-    localStorage.setItem('users', JSON.stringify(users));
-}
+function getUsers() { return JSON.parse(localStorage.getItem('users') || '[]'); }
+function setUsers(users) { localStorage.setItem('users', JSON.stringify(users)); }
 
 function validatePassword(password) {
-    if (password.length < 8) return 'Пароль должен быть минимум 8 символов';
-    if (!/[0-9]/.test(password)) return 'Пароль должен содержать хотя бы одну цифру';
-    if (!/[A-ZА-ЯЁ]/.test(password)) return 'Пароль должен содержать хотя бы одну заглавную букву';
+    if (password.length < 8) return 'Минимум 8 символов';
+    if (!/[0-9]/.test(password)) return 'Нужна хотя бы одна цифра';
+    if (!/[A-ZА-ЯЁ]/.test(password)) return 'Нужна заглавная буква';
     return null;
 }
 
-function showMessage(elementId, message, type = 'error') {
-    const el = document.getElementById(elementId);
-    if (!el) return;
-    el.textContent = message;
-    el.className = type === 'error' ? 'error-message' : 'success-message';
-}
-
-// ==================== ПЕРЕКЛЮЧЕНИЕ ПАРОЛЯ ====================
 document.addEventListener('DOMContentLoaded', () => {
+    // Переключение пароля
     document.querySelectorAll('.toggle-password').forEach(btn => {
         btn.addEventListener('click', () => {
             const input = btn.parentElement.querySelector('input');
@@ -39,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // ==================== РЕГИСТРАЦИЯ ====================
+    // Регистрация
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', (e) => {
@@ -51,61 +38,39 @@ document.addEventListener('DOMContentLoaded', () => {
             const password = document.getElementById('regPassword').value;
             const passwordConfirm = document.getElementById('regPasswordConfirm').value;
 
-            // Валидация
-            if (!name || !email || !login || !password) {
-                alert('Заполните все поля');
-                return;
-            }
+            if (!name || !email || !login || !password) { alert('Заполните все поля'); return; }
 
             const passwordError = validatePassword(password);
-            if (passwordError) {
-                alert(passwordError);
-                return;
-            }
+            if (passwordError) { alert(passwordError); return; }
 
-            if (password !== passwordConfirm) {
-                alert('Пароли не совпадают');
-                return;
-            }
+            if (password !== passwordConfirm) { alert('Пароли не совпадают'); return; }
 
-            // Проверка уникальности
             const users = getUsers();
-            const emailExists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
-            const loginExists = users.some(u => u.login.toLowerCase() === login.toLowerCase());
-
-            if (emailExists) {
-                alert('Пользователь с таким email уже существует');
-                return;
+            if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+                alert('Email уже используется'); return;
             }
-            if (loginExists) {
-                alert('Такой логин уже занят');
-                return;
+            if (users.some(u => u.login.toLowerCase() === login.toLowerCase())) {
+                alert('Логин уже занят'); return;
             }
 
-            // Создание пользователя
             const newUser = {
                 id: Date.now(),
-                name,
-                email,
-                login,
-                password,
-                role: users.length === 0 ? 'admin' : 'user', // первый пользователь = админ
-                phone: '',
-                bio: '',
+                name, email, login, password,
+                role: users.length === 0 ? 'admin' : 'user',
+                phone: '', bio: '',
+                deliveryMethods: [],
                 createdAt: new Date().toISOString()
             };
 
             users.push(newUser);
             setUsers(users);
-
-            // Авто-вход
             localStorage.setItem('currentUser', JSON.stringify(newUser));
             alert('Регистрация успешна!');
             window.location.href = 'profile.html';
         });
     }
 
-    // ==================== ВХОД ====================
+    // Вход
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
@@ -114,10 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const emailOrLogin = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value;
 
-            if (!emailOrLogin || !password) {
-                alert('Заполните все поля');
-                return;
-            }
+            if (!emailOrLogin || !password) { alert('Заполните все поля'); return; }
 
             const users = getUsers();
             const user = users.find(u =>
@@ -125,15 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 u.login.toLowerCase() === emailOrLogin.toLowerCase()
             );
 
-            if (!user) {
-                alert('Пользователь не найден');
-                return;
-            }
-
-            if (user.password !== password) {
-                alert('Неверный пароль');
-                return;
-            }
+            if (!user) { alert('Пользователь не найден'); return; }
+            if (user.password !== password) { alert('Неверный пароль'); return; }
 
             localStorage.setItem('currentUser', JSON.stringify(user));
             alert('Вход выполнен!');
