@@ -9,7 +9,6 @@ function validatePassword(password) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Переключение пароля
     document.querySelectorAll('.toggle-password').forEach(btn => {
         btn.addEventListener('click', () => {
             const input = btn.parentElement.querySelector('input');
@@ -26,12 +25,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Регистрация
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', (e) => {
             e.preventDefault();
-
             const name = document.getElementById('regName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
             const login = document.getElementById('regLogin').value.trim();
@@ -39,25 +36,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const passwordConfirm = document.getElementById('regPasswordConfirm').value;
 
             if (!name || !email || !login || !password) { alert('Заполните все поля'); return; }
-
             const passwordError = validatePassword(password);
             if (passwordError) { alert(passwordError); return; }
-
             if (password !== passwordConfirm) { alert('Пароли не совпадают'); return; }
 
             const users = getUsers();
-            if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-                alert('Email уже используется'); return;
-            }
-            if (users.some(u => u.login.toLowerCase() === login.toLowerCase())) {
-                alert('Логин уже занят'); return;
-            }
+            if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) { alert('Email уже используется'); return; }
+            if (users.some(u => u.login.toLowerCase() === login.toLowerCase())) { alert('Логин уже занят'); return; }
 
             const newUser = {
                 id: Date.now(),
                 name, email, login, password,
                 role: users.length === 0 ? 'admin' : 'user',
                 phone: '', bio: '',
+                avatar: null,
+                background: null,
                 deliveryMethods: [],
                 createdAt: new Date().toISOString()
             };
@@ -70,12 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Вход
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
-
             const emailOrLogin = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value;
 
