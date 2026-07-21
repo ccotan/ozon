@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Продавцы — Ozon Minecraft</title>
+    <title>Магазин продавца — Ozon Minecraft</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -15,8 +15,7 @@
                 <nav class="nav">
                     <a href="index.html" class="nav-link">Главная</a>
                     <a href="catalog.html" class="nav-link">Каталог</a>
-                    <a href="sellers.html" class="nav-link active"><i class="fas fa-store"></i> Продавцы</a>
-                    <a href="cart.html" class="nav-link"><i class="fas fa-shopping-cart"></i> Корзина <span id="cartCount" class="badge badge-admin" style="margin-left: 5px;">0</span></a>
+                    <a href="sellers.html" class="nav-link">Продавцы</a>
                 </nav>
                 <div class="header-actions">
                     <a href="login.html" class="btn btn-primary" id="loginBtn"><i class="fas fa-user"></i> Войти</a>
@@ -26,11 +25,24 @@
             </div>
         </div>
     </header>
-    <div class="breadcrumbs"><div class="container"><a href="index.html">Главная</a><span>›</span><span>Продавцы</span></div></div>
+    <div class="breadcrumbs"><div class="container"><a href="index.html">Главная</a><span>›</span><a href="sellers.html">Продавцы</a><span>›</span><span id="sellerNameBc">Магазин</span></div></div>
     <main class="main">
         <div class="container">
-            <h1 style="font-size: 32px; margin-bottom: 30px; font-weight: 800;"><i class="fas fa-store" style="color: var(--color-lime);"></i> Продавцы</h1>
-            <div class="sellers-grid" id="sellersGrid"></div>
+            <div class="seller-profile-header" id="sellerProfileHeader">
+                <div class="seller-profile-bg" id="sellerBg"></div>
+                <div class="seller-profile-info">
+                    <div class="seller-profile-avatar" id="sellerAvatar"><i class="fas fa-store"></i></div>
+                    <div class="seller-profile-details">
+                        <h1 id="sellerTitle">Название магазина</h1>
+                        <p id="sellerBio">Описание магазина</p>
+                    </div>
+                    <button class="btn btn-danger" id="reportSellerBtn" style="margin-left: auto;"><i class="fas fa-flag"></i> Пожаловаться</button>
+                </div>
+            </div>
+            <section class="products animate-on-scroll">
+                <h2>Товары продавца</h2>
+                <div class="products-grid" id="sellerProductsGrid"></div>
+            </section>
         </div>
     </main>
     <footer class="footer"><div class="container"><p>&copy; 2026 Ozon Minecraft</p></div></footer>
