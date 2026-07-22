@@ -37,10 +37,14 @@
                     </div>
                 </div>
                 <div class="chat-messages" id="chatMessages"></div>
-                <div class="chat-input-area">
-                    <input type="text" id="chatInput" placeholder="Введите сообщение..." class="chat-input">
-                    <button class="btn btn-primary" id="sendMessageBtn"><i class="fas fa-paper-plane"></i></button>
-                </div>
+<div class="chat-input-area">
+    <input type="file" id="chatImageInput" accept="image/*" style="display: none;">
+    <button class="btn btn-secondary" onclick="document.getElementById('chatImageInput').click()" title="Отправить изображение">
+        <i class="fas fa-image"></i>
+    </button>
+    <input type="text" id="chatInput" placeholder="Введите сообщение..." class="chat-input">
+    <button class="btn btn-primary" id="sendMessageBtn"><i class="fas fa-paper-plane"></i></button>
+</div>
             </div>
         </div>
     </main>
