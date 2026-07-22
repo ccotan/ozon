@@ -8,7 +8,6 @@ async function initCategories() {
     const categoriesRef = collection(db, 'categories');
     const snapshot = await getDocs(categoriesRef);
     
-    // Удаляем пустые документы
     for (const docSnap of snapshot.docs) {
         const data = docSnap.data();
         if (!data.name || !data.id) {
@@ -16,7 +15,6 @@ async function initCategories() {
         }
     }
     
-    // Создаём категории если их нет
     const defaultCategories = [
         { id: 'blocks', name: 'Блоки', icon: 'fa-cube' },
         { id: 'items', name: 'Предметы', icon: 'fa-gem' },
@@ -163,57 +161,45 @@ function renderProducts(containerId, products = []) {
     });
 }
 
-window.buyProductDirect = async function(productId) {
-    const productDoc = await getDoc(doc(db, 'products', productId));
-    if (productDoc.exists()) {
-        const product = { id: productDoc.id, ...productDoc.data() };
-        buyProduct(product);
-    }
-};
-
-window.addToCart = async function(productId) {
-    const productDoc = await getDoc(doc(db, 'products', productId));
-    if (productDoc.exists()) {
-        const product = { id: productDoc.id, ...productDoc.data() };
-        addToCart(product);
-    }
-};
-
 window.contactAboutProduct = async function(productId) {
-    const productDoc = await getDoc(doc(db, 'products', productId));
-    if (!productDoc.exists()) return;
-    const product = { id: productDoc.id, ...productDoc.data() };
-    const user = getCurrentUser();
-    if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
-    
-    const chats = await getDocs(collection(db, 'chats'));
-    const existingChat = chats.docs.find(c => {
-        const data = c.data();
-        return (data.buyerId === user.uid && data.sellerId === product.sellerId && data.productId === productId) ||
-               (data.sellerId === user.uid && data.buyerId === product.sellerId && data.productId === productId);
-    });
-    
-    if (existingChat) {
-        window.location.href = `chat.html?chatId=${existingChat.id}`;
-    } else {
-        const chatRef = await addDoc(collection(db, 'chats'), {
-            orderId: null,
-            buyerId: user.uid,
-            sellerId: product.sellerId,
-            productId: productId,
-            productTitle: product.title,
-            productImage: product.image || null,
-            productIcon: product.icon || 'fa-cube',
-            productPrice: product.price,
-            messages: [{
-                id: 1,
-                userId: user.uid,
-                text: `Здравствуйте! Интересует "${product.title}". Есть вопросы по товару.`,
-                time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-            }],
-            createdAt: new Date().toISOString()
+    try {
+        const productDoc = await getDoc(doc(db, 'products', productId));
+        if (!productDoc.exists()) return;
+        const product = { id: productDoc.id, ...productDoc.data() };
+        const user = getCurrentUser();
+        if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
+        
+        const chats = await getDocs(collection(db, 'chats'));
+        const existingChat = chats.docs.find(c => {
+            const data = c.data();
+            return (data.buyerId === user.uid && data.sellerId === product.sellerId && data.productId === productId) ||
+                   (data.sellerId === user.uid && data.buyerId === product.sellerId && data.productId === productId);
         });
-        window.location.href = `chat.html?chatId=${chatRef.id}`;
+        
+        if (existingChat) {
+            window.location.href = `chat.html?chatId=${existingChat.id}`;
+        } else {
+            const chatRef = await addDoc(collection(db, 'chats'), {
+                orderId: null,
+                buyerId: user.uid,
+                sellerId: product.sellerId,
+                productId: productId,
+                productTitle: product.title,
+                productImage: product.image || null,
+                productIcon: product.icon || 'fa-cube',
+                productPrice: product.price,
+                messages: [{
+                    id: 1,
+                    userId: user.uid,
+                    text: `Здравствуйте! Интересует "${product.title}". Есть вопросы по товару.`,
+                    time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                }],
+                createdAt: new Date().toISOString()
+            });
+            window.location.href = `chat.html?chatId=${chatRef.id}`;
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
     }
 };
 
@@ -352,7 +338,7 @@ async function buyProduct(product) {
         `profile.html#sales`
     );
 
-    alert('Заказ оформлен! Чат с продавцом открыт.');
+    alert('Заказ оформлен! Переход в чат с продавцом...');
     window.location.href = `chat.html?chatId=${chatRef.id}`;
 }
 
@@ -389,28 +375,28 @@ function addToCart(product) {
     showNotification('Товар добавлен в корзину', 'success');
 }
 
-function removeFromCart(productId) {
+window.removeFromCart = function(productId) {
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     const newCart = cart.filter(i => i.productId !== productId);
     localStorage.setItem('cart', JSON.stringify(newCart));
     updateHeader();
     initCart();
-}
+};
 
-function changeCartQty(productId, delta) {
+window.changeCartQty = function(productId, delta) {
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     const item = cart.find(i => i.productId === productId);
     if (!item) return;
 
     item.quantity += delta;
     if (item.quantity <= 0) {
-        removeFromCart(productId);
+        window.removeFromCart(productId);
     } else {
         localStorage.setItem('cart', JSON.stringify(cart));
         updateHeader();
         initCart();
     }
-}
+};
 
 async function initCart() {
     const cartItemsEl = document.getElementById('cartItems');
@@ -449,11 +435,11 @@ async function initCart() {
                 </div>
                 <div class="cart-item-controls">
                     <div class="quantity-control">
-                        <button class="quantity-btn" onclick="changeCartQty('${item.productId}', -1)">-</button>
+                        <button class="quantity-btn" onclick="window.changeCartQty('${item.productId}', -1)">-</button>
                         <span class="quantity-value">${item.quantity}</span>
-                        <button class="quantity-btn" onclick="changeCartQty('${item.productId}', 1)">+</button>
+                        <button class="quantity-btn" onclick="window.changeCartQty('${item.productId}', 1)">+</button>
                     </div>
-                    <button class="btn btn-danger btn-small" onclick="removeFromCart('${item.productId}')">
+                    <button class="btn btn-danger btn-small" onclick="window.removeFromCart('${item.productId}')">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -476,7 +462,7 @@ async function checkoutCart() {
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     if (cart.length === 0) return;
 
-    const orders = [];
+    let ordersCount = 0;
 
     for (const item of cart) {
         const productDoc = await getDoc(doc(db, 'products', item.productId));
@@ -507,7 +493,7 @@ async function checkoutCart() {
         };
         
         const orderRef = await addDoc(collection(db, 'orders'), order);
-        orders.push(orderRef.id);
+        ordersCount++;
 
         await addDoc(collection(db, 'chats'), {
             orderId: orderRef.id,
@@ -535,10 +521,10 @@ async function checkoutCart() {
         );
     }
 
-    if (orders.length > 0) {
+    if (ordersCount > 0) {
         localStorage.setItem('cart', '[]');
         updateHeader();
-        alert(`Заказ оформлен! Товаров: ${orders.length}`);
+        alert(`Заказ оформлен! Товаров: ${ordersCount}`);
         window.location.href = 'profile.html#purchases';
     }
 }
@@ -847,7 +833,7 @@ async function initProfile() {
                             <label>Координаты (X Y Z)</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
                                 <input type="text" class="pickup-coords" value="${point.coords || ''}" placeholder="100 64 -200" required style="flex: 1;">
-                                <button type="button" class="copy-coords-btn" onclick="copyCoords(this)"><i class="fas fa-copy"></i> Копировать</button>
+                                <button type="button" class="copy-coords-btn" onclick="window.copyCoords(this)"><i class="fas fa-copy"></i> Копировать</button>
                             </div>
                             <small class="form-hint">Например: 100 64 -200</small>
                         </div>
@@ -900,7 +886,7 @@ async function initProfile() {
                     <label>Координаты (X Y Z)</label>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="text" class="pickup-coords" placeholder="100 64 -200" required style="flex: 1;">
-                        <button type="button" class="copy-coords-btn" onclick="copyCoords(this)"><i class="fas fa-copy"></i> Копировать</button>
+                        <button type="button" class="copy-coords-btn" onclick="window.copyCoords(this)"><i class="fas fa-copy"></i> Копировать</button>
                     </div>
                     <small class="form-hint">Например: 100 64 -200</small>
                 </div>
@@ -973,12 +959,17 @@ async function initProfile() {
     };
 
     window.openChatByOrder = async function(orderId) {
-        const chatsSnapshot = await getDocs(query(collection(db, 'chats'), where('orderId', '==', orderId)));
-        if (!chatsSnapshot.empty) {
-            const chat = chatsSnapshot.docs[0];
-            window.location.href = `chat.html?chatId=${chat.id}`;
-        } else {
-            alert('Чат не найден');
+        try {
+            const chatsSnapshot = await getDocs(query(collection(db, 'chats'), where('orderId', '==', orderId)));
+            if (!chatsSnapshot.empty) {
+                const chat = chatsSnapshot.docs[0];
+                window.location.href = `chat.html?chatId=${chat.id}`;
+            } else {
+                alert('Чат не найден');
+            }
+        } catch (error) {
+            console.error('Ошибка открытия чата:', error);
+            alert('Ошибка открытия чата');
         }
     };
 
@@ -1466,6 +1457,37 @@ window.copyCoords = function(btn) {
             btn.innerHTML = '<i class="fas fa-check"></i> Скопировано';
             setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
         });
+    }
+};
+
+window.buyProductDirect = async function(productId) {
+    try {
+        const productDoc = await getDoc(doc(db, 'products', productId));
+        if (!productDoc.exists()) {
+            alert('Товар не найден');
+            return;
+        }
+        
+        const product = { id: productDoc.id, ...productDoc.data() };
+        await buyProduct(product);
+    } catch (error) {
+        console.error('Ошибка покупки:', error);
+        alert('Ошибка при покупке');
+    }
+};
+
+window.addToCart = async function(productId) {
+    try {
+        const productDoc = await getDoc(doc(db, 'products', productId));
+        if (!productDoc.exists()) {
+            alert('Товар не найден');
+            return;
+        }
+        
+        const product = { id: productDoc.id, ...productDoc.data() };
+        addToCart(product);
+    } catch (error) {
+        console.error('Ошибка добавления в корзину:', error);
     }
 };
 
