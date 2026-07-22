@@ -1,6 +1,6 @@
 import { getCurrentUser, logoutUser } from './auth.js';
 import { db, auth } from './firebase.js';
-import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, onSnapshot, query, where, orderBy } from './firebase.js';
+import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, onSnapshot, query, where } from './firebase.js';
 import { compressImage, validateImage } from './imageUtils.js';
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================
@@ -896,20 +896,19 @@ async function initProfile() {
         });
     }
 
-    // ПРОДАЖИ - С СОРТИРОВКОЙ НОВЫЕ СВЕРХУ
+    // ПРОДАЖИ - С КЛИЕНТСКОЙ СОРТИРОВКОЙ
     async function renderSales() {
         const container = document.getElementById('salesContent');
         if (!container) return;
         
         try {
             const ordersSnapshot = await getDocs(
-                query(
-                    collection(db, 'orders'), 
-                    where('sellerId', '==', user.uid),
-                    orderBy('createdAt', 'desc')
-                )
+                query(collection(db, 'orders'), where('sellerId', '==', user.uid))
             );
-            const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            let orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Сортируем на клиенте: новые сверху
+            orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             
             if (orders.length === 0) {
                 container.innerHTML = '<div class="empty-state"><i class="fas fa-hand-holding-usd"></i><p>У вас пока нет продаж</p></div>';
@@ -973,37 +972,47 @@ async function initProfile() {
         location.reload();
     };
 
+    // ИСПРАВЛЕНО: Открытие чата
     window.openChatByOrder = async function(orderId) {
         try {
-            const chatsSnapshot = await getDocs(query(collection(db, 'chats'), where('orderId', '==', orderId)));
-            if (!chatsSnapshot.empty) {
-                const chat = chatsSnapshot.docs[0];
-                window.location.href = `chat.html?chatId=${chat.id}`;
+            // Получаем все чаты
+            const chatsSnapshot = await getDocs(collection(db, 'chats'));
+            
+            // Ищем чат с нужным orderId
+            let chatDoc = null;
+            chatsSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.orderId === orderId) {
+                    chatDoc = doc;
+                }
+            });
+            
+            if (chatDoc) {
+                window.location.href = `chat.html?chatId=${chatDoc.id}`;
             } else {
                 alert('Чат не найден');
             }
         } catch (error) {
             console.error('Ошибка открытия чата:', error);
-            alert('Ошибка открытия чата');
+            alert('Ошибка открытия чата: ' + error.message);
         }
     };
 
     renderSales();
 
-    // ПОКУПКИ - С СОРТИРОВКОЙ НОВЫЕ СВЕРХУ
+    // ПОКУПКИ - С КЛИЕНТСКОЙ СОРТИРОВКОЙ
     async function renderPurchases() {
         const container = document.getElementById('purchasesContent');
         if (!container) return;
         
         try {
             const ordersSnapshot = await getDocs(
-                query(
-                    collection(db, 'orders'), 
-                    where('buyerId', '==', user.uid),
-                    orderBy('createdAt', 'desc')
-                )
+                query(collection(db, 'orders'), where('buyerId', '==', user.uid))
             );
-            const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            let orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Сортируем на клиенте: новые сверху
+            orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             
             if (orders.length === 0) {
                 container.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-bag"></i><p>У вас пока нет покупок</p></div>';
