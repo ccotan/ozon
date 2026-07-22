@@ -1,73 +1,146 @@
-function getUsers() { return JSON.parse(localStorage.getItem('users') || '[]'); }
-function setUsers(users) { localStorage.setItem('users', JSON.stringify(users)); }
+import { auth, googleProvider, db } from './firebase.js';
+import { 
+    signInWithPopup, createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, signOut, onAuthStateChanged 
+} from './firebase.js';
+import { doc, setDoc, getDocs, collection } from './firebase.js';
 
-function validatePassword(password) {
-    if (password.length < 8) return 'Минимум 8 символов';
-    if (!/[0-9]/.test(password)) return 'Нужна хотя бы одна цифра';
-    if (!/[A-ZА-ЯЁ]/.test(password)) return 'Нужна заглавная буква';
-    return null;
+let currentUser = null;
+
+onAuthStateChanged(auth, (user) => {
+    currentUser = user;
+    if (window.updateHeaderCallback) {
+        window.updateHeaderCallback(user);
+    }
+});
+
+export function getCurrentUser() {
+    return currentUser;
+}
+
+export async function logoutUser() {
+    await signOut(auth);
+    window.location.href = 'index.html';
+}
+
+// Вход через Google
+export async function signInWithGoogle() {
+    try {
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+        
+        // Проверяем, есть ли пользователь в Firestore
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDocs(collection(db, 'users'));
+        const exists = userDocSnap.docs.some(d => d.id === user.uid);
+        
+        if (!exists) {
+            // Создаём нового пользователя
+            const usersCount = userDocSnap.size;
+            const role = usersCount === 0 ? 'admin' : 'user';
+            
+            await setDoc(userDocRef, {
+                uid: user.uid,
+                name: user.displayName || 'Пользователь',
+                email: user.email,
+                login: user.email.split('@')[0],
+                role,
+                phone: '',
+                bio: '',
+                avatar: user.photoURL || null,
+                background: null,
+                deliveryMethods: [],
+                provider: 'google',
+                createdAt: new Date().toISOString()
+            });
+        }
+        
+        return user;
+    } catch (error) {
+        console.error('Ошибка входа через Google:', error);
+        alert('Ошибка входа через Google: ' + error.message);
+        return null;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Кнопка входа через Google
+    const googleBtn = document.getElementById('googleLoginBtn');
+    if (googleBtn) {
+        googleBtn.addEventListener('click', async () => {
+            const user = await signInWithGoogle();
+            if (user) {
+                window.location.href = 'profile.html';
+            }
+        });
+    }
+
+    // Регистрация
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
-        registerForm.addEventListener('submit', (e) => {
+        registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const name = document.getElementById('regName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
             const login = document.getElementById('regLogin').value.trim();
             const password = document.getElementById('regPassword').value;
             const passwordConfirm = document.getElementById('regPasswordConfirm').value;
 
-            if (!name || !email || !login || !password) { alert('Заполните все поля'); return; }
-            const passwordError = validatePassword(password);
-            if (passwordError) { alert(passwordError); return; }
+            if (!name || !email || !login || !password) { 
+                alert('Заполните все поля'); 
+                return; 
+            }
+            if (password.length < 8) { alert('Минимум 8 символов'); return; }
+            if (!/[0-9]/.test(password)) { alert('Нужна хотя бы одна цифра'); return; }
+            if (!/[A-ZА-ЯЁ]/.test(password)) { alert('Нужна заглавная буква'); return; }
             if (password !== passwordConfirm) { alert('Пароли не совпадают'); return; }
 
-            const users = getUsers();
-            if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) { alert('Email уже используется'); return; }
-            if (users.some(u => u.login.toLowerCase() === login.toLowerCase())) { alert('Логин уже занят'); return; }
-
-            const newUser = {
-                id: Date.now(),
-                name, email, login, password,
-                role: users.length === 0 ? 'admin' : 'user',
-                phone: '', bio: '',
-                avatar: null,
-                background: null,
-                deliveryMethods: [],
-                createdAt: new Date().toISOString()
-            };
-
-            users.push(newUser);
-            setUsers(users);
-            localStorage.setItem('currentUser', JSON.stringify(newUser));
-            alert('Регистрация успешна!');
-            window.location.href = 'profile.html';
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                const users = await getDocs(collection(db, 'users'));
+                const role = users.empty ? 'admin' : 'user';
+                
+                await setDoc(doc(db, 'users', user.uid), {
+                    uid: user.uid,
+                    name, email, login,
+                    role,
+                    phone: '', bio: '',
+                    avatar: null, background: null,
+                    deliveryMethods: [],
+                    provider: 'email',
+                    createdAt: new Date().toISOString()
+                });
+                
+                window.location.href = 'profile.html';
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            }
         });
     }
 
+    // Вход по email/паролю
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
-        loginForm.addEventListener('submit', (e) => {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const emailOrLogin = document.getElementById('loginEmail').value.trim();
+            
+            const email = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value;
 
-            if (!emailOrLogin || !password) { alert('Заполните все поля'); return; }
+            if (!email || !password) { 
+                alert('Заполните все поля'); 
+                return; 
+            }
 
-            const users = getUsers();
-            const user = users.find(u =>
-                u.email.toLowerCase() === emailOrLogin.toLowerCase() ||
-                u.login.toLowerCase() === emailOrLogin.toLowerCase()
-            );
-
-            if (!user) { alert('Пользователь не найден'); return; }
-            if (user.password !== password) { alert('Неверный пароль'); return; }
-
-            localStorage.setItem('currentUser', JSON.stringify(user));
-            alert('Вход выполнен!');
-            window.location.href = 'profile.html';
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                window.location.href = 'profile.html';
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            }
         });
     }
 });
