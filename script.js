@@ -51,6 +51,67 @@ function initScrollAnimations() {
     document.querySelectorAll('.animate-on-scroll').forEach(el => obs.observe(el));
 }
 
+// ==================== УВЕДОМЛЕНИЯ ====================
+async function loadNotifications() {
+    const user = getCurrentUser();
+    if (!user) return;
+    
+    const notificationsBtn = document.getElementById('notificationsBtn');
+    const notificationsCount = document.getElementById('notificationsCount');
+    
+    if (!notificationsBtn || !notificationsCount) return;
+    
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(notificationsRef, where('userId', '==', user.uid), where('read', '==', false));
+    const snapshot = await getDocs(q);
+    
+    const count = snapshot.size;
+    if (count > 0) {
+        notificationsCount.textContent = count;
+        notificationsCount.style.display = 'inline-block';
+    } else {
+        notificationsCount.style.display = 'none';
+    }
+    
+    notificationsBtn.onclick = () => showNotificationsList();
+}
+
+async function showNotificationsList() {
+    const user = getCurrentUser();
+    if (!user) return;
+    
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(notificationsRef, where('userId', '==', user.uid));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+        alert('Нет уведомлений');
+        return;
+    }
+    
+    let message = '📢 Уведомления:\n\n';
+    snapshot.docs.forEach(doc => {
+        const n = doc.data();
+        message += `• ${n.title}\n  ${n.message}\n  ${new Date(n.createdAt).toLocaleString('ru-RU')}\n\n`;
+        
+        // Помечаем как прочитанное
+        if (!n.read) {
+            updateDoc(doc.ref, { read: true });
+        }
+    });
+    
+    alert(message);
+    loadNotifications();
+}
+
+async function createNotification(userId, title, message, link = '') {
+    await addDoc(collection(db, 'notifications'), {
+        userId, title, message, link,
+        read: false,
+        createdAt: new Date().toISOString()
+    });
+}
+
 // ==================== ШАПКА ====================
 function updateHeader() {
     const user = getCurrentUser();
@@ -79,6 +140,9 @@ function updateHeader() {
                 if (adminBtn) adminBtn.classList.add('hidden');
             }
         });
+        
+        // Загружаем уведомления
+        loadNotifications();
     } else {
         if (loginBtn) loginBtn.classList.remove('hidden');
         if (profileBtn) profileBtn.classList.add('hidden');
@@ -255,10 +319,10 @@ function showProductModal(product) {
 
     const reportProductBtn = document.getElementById('reportProductBtn');
     if (reportProductBtn) {
-        reportProductBtn.onclick = () => {
+        reportProductBtn.onclick = async () => {
             const reason = prompt('Причина жалобы:');
             if (reason && reason.trim()) {
-                submitReport('product', product.id, product.sellerId, reason.trim());
+                await submitReport('product', product.id, product.sellerId, reason.trim());
                 alert('Жалоба отправлена');
                 modal.remove();
             }
@@ -295,26 +359,10 @@ async function buyProduct(product) {
     const quantity = parseInt(prompt(`Сколько штук купить? (доступно: ${currentProduct.quantity})`, '1'));
     if (!quantity || quantity <= 0 || quantity > currentProduct.quantity) { alert('Неверное количество'); return; }
 
-    const order = {
-        productId: product.id,
-        productTitle: currentProduct.title,
-        productImage: currentProduct.image || null,
-        productIcon: currentProduct.icon || 'fa-cube',
-        price: currentProduct.price,
-        quantity: quantity,
-        total: currentProduct.price * quantity,
-        buyerId: user.uid,
-        buyerName: user.displayName || user.email,
-        sellerId: currentProduct.sellerId,
-        sellerName: currentProduct.sellerName,
-        status: 'pending',
-        delivery: currentProduct.delivery,
-        createdAt: new Date().toISOString()
-    };
-    const orderRef = await addDoc(collection(db, 'orders'), order);
+    const total = currentProduct.price * quantity;
 
+    // Сначала создаём чат
     const chatRef = await addDoc(collection(db, 'chats'), {
-        orderId: orderRef.id,
         buyerId: user.uid,
         sellerId: currentProduct.sellerId,
         productId: product.id,
@@ -322,23 +370,45 @@ async function buyProduct(product) {
         productImage: currentProduct.image || null,
         productIcon: currentProduct.icon || 'fa-cube',
         productPrice: currentProduct.price,
+        productQuantity: quantity,
+        productTotal: total,
         messages: [{
             id: 1,
             userId: user.uid,
-            text: `Здравствуйте! Я купил "${currentProduct.title}" (${quantity} шт). Жду подтверждения.`,
+            text: `Здравствуйте! Я купил "${currentProduct.title}" (${quantity} шт) за ${total.toLocaleString('ru-RU')} АР. Жду подтверждения.`,
             time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
         }],
         createdAt: new Date().toISOString()
     });
 
+    // Потом создаём заказ с chatId
+    const order = {
+        productId: product.id,
+        productTitle: currentProduct.title,
+        productImage: currentProduct.image || null,
+        productIcon: currentProduct.icon || 'fa-cube',
+        price: currentProduct.price,
+        quantity: quantity,
+        total: total,
+        buyerId: user.uid,
+        buyerName: user.displayName || user.email,
+        sellerId: currentProduct.sellerId,
+        sellerName: currentProduct.sellerName,
+        status: 'pending',
+        delivery: currentProduct.delivery,
+        chatId: chatRef.id,
+        createdAt: new Date().toISOString()
+    };
+    await addDoc(collection(db, 'orders'), order);
+
     await createNotification(
         currentProduct.sellerId,
-        'Новый заказ',
-        `${user.displayName || user.email} купил "${currentProduct.title}"`,
+        '🛒 Новый заказ',
+        `${user.displayName || user.email} купил "${currentProduct.title}" (${quantity} шт) за ${total.toLocaleString('ru-RU')} АР`,
         `profile.html#sales`
     );
 
-    alert('Заказ оформлен! Переход в чат с продавцом...');
+    alert(`Заказ оформлен на сумму ${total.toLocaleString('ru-RU')} АР! Переход в чат с продавцом...`);
     window.location.href = `chat.html?chatId=${chatRef.id}`;
 }
 
@@ -463,6 +533,7 @@ async function checkoutCart() {
     if (cart.length === 0) return;
 
     let ordersCount = 0;
+    let totalSum = 0;
 
     for (const item of cart) {
         const productDoc = await getDoc(doc(db, 'products', item.productId));
@@ -475,28 +546,11 @@ async function checkoutCart() {
         }
         if (product.sellerId === user.uid) continue;
 
-        const order = {
-            productId: item.productId,
-            productTitle: item.title,
-            productImage: item.image,
-            productIcon: item.icon,
-            price: item.price,
-            quantity: item.quantity,
-            total: item.price * item.quantity,
-            buyerId: user.uid,
-            buyerName: user.displayName || user.email,
-            sellerId: product.sellerId,
-            sellerName: product.sellerName,
-            status: 'pending',
-            delivery: product.delivery,
-            createdAt: new Date().toISOString()
-        };
-        
-        const orderRef = await addDoc(collection(db, 'orders'), order);
-        ordersCount++;
+        const total = item.price * item.quantity;
+        totalSum += total;
 
-        await addDoc(collection(db, 'chats'), {
-            orderId: orderRef.id,
+        const chatRef = await addDoc(collection(db, 'chats'), {
+            orderId: null,
             buyerId: user.uid,
             sellerId: product.sellerId,
             productId: item.productId,
@@ -504,27 +558,49 @@ async function checkoutCart() {
             productImage: item.image,
             productIcon: item.icon,
             productPrice: item.price,
+            productQuantity: item.quantity,
+            productTotal: total,
             messages: [{
                 id: 1,
                 userId: user.uid,
-                text: `Здравствуйте! Я купил "${item.title}" (${item.quantity} шт). Жду подтверждения.`,
+                text: `Здравствуйте! Я купил "${item.title}" (${item.quantity} шт) за ${total.toLocaleString('ru-RU')} АР. Жду подтверждения.`,
                 time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
             }],
+            createdAt: new Date().toISOString()
+        });
+
+        await addDoc(collection(db, 'orders'), {
+            productId: item.productId,
+            productTitle: item.title,
+            productImage: item.image,
+            productIcon: item.icon,
+            price: item.price,
+            quantity: item.quantity,
+            total: total,
+            buyerId: user.uid,
+            buyerName: user.displayName || user.email,
+            sellerId: product.sellerId,
+            sellerName: product.sellerName,
+            status: 'pending',
+            delivery: product.delivery,
+            chatId: chatRef.id,
             createdAt: new Date().toISOString()
         });
         
         await createNotification(
             product.sellerId,
-            'Новый заказ',
-            `${user.displayName || user.email} купил "${item.title}"`,
+            '🛒 Новый заказ',
+            `${user.displayName || user.email} купил "${item.title}" (${item.quantity} шт) за ${total.toLocaleString('ru-RU')} АР`,
             `profile.html#sales`
         );
+        
+        ordersCount++;
     }
 
     if (ordersCount > 0) {
         localStorage.setItem('cart', '[]');
         updateHeader();
-        alert(`Заказ оформлен! Товаров: ${ordersCount}`);
+        alert(`Заказ оформлен! Товаров: ${ordersCount}, Общая сумма: ${totalSum.toLocaleString('ru-RU')} АР`);
         window.location.href = 'profile.html#purchases';
     }
 }
@@ -907,7 +983,6 @@ async function initProfile() {
             );
             
             let orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // Сортируем на клиенте: новые сверху
             orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             
             if (orders.length === 0) {
@@ -927,12 +1002,12 @@ async function initProfile() {
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                         <div>
                             <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
-                            <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
+                            <div style="font-size: 16px; color: var(--color-text-secondary);">Цена: ${o.price.toLocaleString('ru-RU')} АР × ${o.quantity} = <strong style="color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</strong></div>
                         </div>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            ${o.status === 'pending' ? `<button class="btn btn-success" onclick="window.confirmSale('${o.id}', '${o.productId}', ${o.quantity})"><i class="fas fa-check"></i> Подтвердить продажу</button>` : ''}
-                            ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelSale('${o.id}', '${o.productId}', ${o.quantity})"><i class="fas fa-times"></i> Отменить</button>` : ''}
-                            <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат</button>
+                            ${o.status === 'pending' ? `<button class="btn btn-success" onclick="window.confirmSale('${o.id}', '${o.chatId}')"><i class="fas fa-check"></i> Подтвердить</button>` : ''}
+                            ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelSale('${o.id}', '${o.chatId}')"><i class="fas fa-times"></i> Отменить</button>` : ''}
+                            <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.chatId}')"><i class="fas fa-comments"></i> Чат</button>
                         </div>
                     </div>
                 </div>
@@ -943,59 +1018,40 @@ async function initProfile() {
         }
     }
 
-    window.confirmSale = async function(orderId, productId, quantity) {
-        if (!confirm('Подтвердить продажу? Количество товара уменьшится.')) return;
+    window.confirmSale = async function(orderId, chatId) {
+        if (!confirm('Подтвердить продажу? Товар будет списан со склада, чат удалён.')) return;
+        
         await updateDoc(doc(db, 'orders', orderId), { status: 'confirmed' });
-        const productDoc = await getDoc(doc(db, 'products', productId));
-        if (productDoc.exists()) {
-            const product = productDoc.data();
-            const newQuantity = product.quantity - quantity;
-            if (newQuantity <= 0) {
-                await deleteDoc(doc(db, 'products', productId));
-            } else {
-                await updateDoc(doc(db, 'products', productId), { quantity: newQuantity });
-            }
+        
+        // Удаляем чат
+        if (chatId) {
+            await deleteDoc(doc(db, 'chats', chatId));
         }
+        
         alert('Продажа подтверждена!');
         location.reload();
     };
 
-    window.cancelSale = async function(orderId, productId, quantity) {
-        if (!confirm('Отменить продажу? Товар вернётся на склад.')) return;
+    window.cancelSale = async function(orderId, chatId) {
+        if (!confirm('Отменить продажу? Товар вернётся на склад, чат будет удалён.')) return;
+        
         await updateDoc(doc(db, 'orders', orderId), { status: 'cancelled' });
-        const productDoc = await getDoc(doc(db, 'products', productId));
-        if (productDoc.exists()) {
-            const product = productDoc.data();
-            await updateDoc(doc(db, 'products', productId), { quantity: product.quantity + quantity });
+        
+        // Удаляем чат
+        if (chatId) {
+            await deleteDoc(doc(db, 'chats', chatId));
         }
+        
         alert('Продажа отменена');
         location.reload();
     };
 
-    // ИСПРАВЛЕНО: Открытие чата
-    window.openChatByOrder = async function(orderId) {
-        try {
-            // Получаем все чаты
-            const chatsSnapshot = await getDocs(collection(db, 'chats'));
-            
-            // Ищем чат с нужным orderId
-            let chatDoc = null;
-            chatsSnapshot.docs.forEach(doc => {
-                const data = doc.data();
-                if (data.orderId === orderId) {
-                    chatDoc = doc;
-                }
-            });
-            
-            if (chatDoc) {
-                window.location.href = `chat.html?chatId=${chatDoc.id}`;
-            } else {
-                alert('Чат не найден');
-            }
-        } catch (error) {
-            console.error('Ошибка открытия чата:', error);
-            alert('Ошибка открытия чата: ' + error.message);
+    window.openChatByOrder = async function(chatId) {
+        if (!chatId) {
+            alert('Чат не найден');
+            return;
         }
+        window.location.href = `chat.html?chatId=${chatId}`;
     };
 
     renderSales();
@@ -1011,7 +1067,6 @@ async function initProfile() {
             );
             
             let orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // Сортируем на клиенте: новые сверху
             orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             
             if (orders.length === 0) {
@@ -1031,11 +1086,11 @@ async function initProfile() {
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                         <div>
                             <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
-                            <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
+                            <div style="font-size: 16px; color: var(--color-text-secondary);">Цена: ${o.price.toLocaleString('ru-RU')} АР × ${o.quantity} = <strong style="color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</strong></div>
                         </div>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelPurchase('${o.id}')"><i class="fas fa-times"></i> Отменить покупку</button>` : ''}
-                            <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат с продавцом</button>
+                            ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelPurchase('${o.id}', '${o.chatId}')"><i class="fas fa-times"></i> Отменить покупку</button>` : ''}
+                            <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.chatId}')"><i class="fas fa-comments"></i> Чат с продавцом</button>
                         </div>
                     </div>
                 </div>
@@ -1046,37 +1101,20 @@ async function initProfile() {
         }
     }
 
-    window.cancelPurchase = async function(orderId) {
+    window.cancelPurchase = async function(orderId, chatId) {
         if (!confirm('Отменить покупку?')) return;
         await updateDoc(doc(db, 'orders', orderId), { status: 'cancelled' });
+        
+        // Удаляем чат
+        if (chatId) {
+            await deleteDoc(doc(db, 'chats', chatId));
+        }
+        
         alert('Покупка отменена');
         location.reload();
     };
 
     renderPurchases();
-}
-
-async function createNotification(userId, title, message, link = '') {
-    await addDoc(collection(db, 'notifications'), {
-        userId, title, message, link,
-        read: false,
-        createdAt: new Date().toISOString()
-    });
-}
-
-function showNotification(text, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.innerHTML = `
-        <div class="notification-header">
-            <span class="notification-title">${type === 'success' ? '✓ Успешно' : type === 'error' ? '✕ Ошибка' : 'ℹ Информация'}</span>
-            <button class="notification-close" onclick="this.closest('.notification').remove()">×</button>
-        </div>
-        <div class="notification-message">${text}</div>
-        <div class="notification-time">${new Date().toLocaleTimeString('ru-RU')}</div>
-    `;
-    document.body.appendChild(notification);
-    setTimeout(() => { notification.remove(); }, 5000);
 }
 
 async function submitReport(type, targetId, reportedUserId, reason) {
@@ -1175,10 +1213,10 @@ async function initSellerPage() {
     if (reportBtn) {
         const user = getCurrentUser();
         if (user && user.uid === sellerId) reportBtn.style.display = 'none';
-        reportBtn.onclick = () => {
+        reportBtn.onclick = async () => {
             const reason = prompt('Причина жалобы на продавца:');
             if (reason && reason.trim()) {
-                submitReport('seller', sellerId, sellerId, reason.trim());
+                await submitReport('seller', sellerId, sellerId, reason.trim());
                 alert('Жалоба отправлена');
             }
         };
@@ -1191,6 +1229,7 @@ async function initChat() {
     const sendBtn = document.getElementById('sendMessageBtn');
     const chatTitle = document.getElementById('chatTitle');
     const chatProductInfo = document.getElementById('chatProductInfo');
+    const imageInput = document.getElementById('chatImageInput');
 
     if (!messagesContainer) return;
 
@@ -1235,6 +1274,8 @@ async function initChat() {
             const imgEl = document.getElementById('chatProductImage');
             const titleEl = document.getElementById('chatProductTitle');
             const priceEl = document.getElementById('chatProductPrice');
+            const quantityEl = document.getElementById('chatProductQuantity');
+            const totalEl = document.getElementById('chatProductTotal');
             
             if (imgEl) {
                 imgEl.innerHTML = chat.productImage ? 
@@ -1243,6 +1284,8 @@ async function initChat() {
             }
             if (titleEl) titleEl.textContent = chat.productTitle;
             if (priceEl) priceEl.textContent = `${chat.productPrice.toLocaleString('ru-RU')} АР`;
+            if (quantityEl) quantityEl.textContent = `Количество: ${chat.productQuantity || 1} шт`;
+            if (totalEl) totalEl.textContent = `Итого: ${(chat.productTotal || chat.productPrice).toLocaleString('ru-RU')} АР`;
         }
 
         onSnapshot(doc(db, 'chats', chatId), (doc) => {
@@ -1251,6 +1294,7 @@ async function initChat() {
             
             messagesContainer.innerHTML = chatData.messages.map(m => `
                 <div class="chat-message ${m.userId === user.uid ? 'own' : ''}">
+                    ${m.image ? `<img src="${m.image}" style="max-width: 200px; border-radius: 8px; margin-bottom: 5px;">` : ''}
                     <div>${escapeHtml(m.text)}</div>
                     <div class="meta">${m.time}</div>
                 </div>
@@ -1260,26 +1304,35 @@ async function initChat() {
 
         function sendMessage() {
             const text = input.value.trim();
-            if (!text) return;
+            if (!text && !imageInput.files[0]) return;
 
             const chatRef = doc(db, 'chats', chatId);
-            getDoc(chatRef).then(docSnap => {
+            getDoc(chatRef).then(async docSnap => {
                 if (!docSnap.exists()) return;
                 
                 const chatData = docSnap.data();
                 const newMessage = {
                     id: Date.now(),
                     userId: user.uid,
-                    text: text,
+                    text: text || (imageInput.files[0] ? '[Изображение]' : ''),
+                    image: null,
                     time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
                 };
+                
+                if (imageInput.files[0]) {
+                    const base64 = await handleImageUpload(imageInput.files[0], 600);
+                    if (base64) {
+                        newMessage.image = base64;
+                    }
+                    imageInput.value = '';
+                }
                 
                 updateDoc(chatRef, { 
                     messages: [...(chatData.messages || []), newMessage] 
                 }).then(() => {
                     createNotification(
                         otherUserId,
-                        'Новое сообщение',
+                        '💬 Новое сообщение',
                         `${user.displayName || user.email} написал(а) вам`,
                         `chat.html?chatId=${chatId}`
                     );
@@ -1293,6 +1346,14 @@ async function initChat() {
         if (input) {
             input.addEventListener('keypress', (e) => { 
                 if (e.key === 'Enter') sendMessage(); 
+            });
+        }
+        
+        if (imageInput) {
+            imageInput.addEventListener('change', () => {
+                if (imageInput.files[0]) {
+                    sendMessage();
+                }
             });
         }
 
@@ -1332,6 +1393,7 @@ async function initAdmin() {
         });
     });
 
+    // Пользователи
     const usersBody = document.getElementById('usersTableBody');
     if (usersBody) {
         const users = await getDocs(collection(db, 'users'));
@@ -1357,6 +1419,7 @@ async function initAdmin() {
         }).join('');
     }
 
+    // Товары
     const productsBody = document.getElementById('productsTableBody');
     if (productsBody) {
         const products = await getDocs(collection(db, 'products'));
@@ -1376,6 +1439,7 @@ async function initAdmin() {
         }).join('');
     }
 
+    // Жалобы
     const reportsContent = document.getElementById('reportsContent');
     if (reportsContent) {
         const reports = await getDocs(collection(db, 'reports'));
@@ -1406,6 +1470,7 @@ async function initAdmin() {
         }
     }
 
+    // Заказы
     const adminOrdersContent = document.getElementById('adminOrdersContent');
     if (adminOrdersContent) {
         const orders = await getDocs(collection(db, 'orders'));
@@ -1423,7 +1488,7 @@ async function initAdmin() {
                             </div>
                             <span class="order-status ${o.status}">${o.status}</span>
                         </div>
-                        <div>Количество: ${o.quantity} шт • Сумма: ${o.total.toLocaleString('ru-RU')} АР</div>
+                        <div>Цена: ${o.price.toLocaleString('ru-RU')} АР × ${o.quantity} шт = <strong>${o.total.toLocaleString('ru-RU')} АР</strong></div>
                     </div>
                 `;
             }).join('');
