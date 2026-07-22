@@ -1,6 +1,6 @@
 import { getCurrentUser, logoutUser } from './auth.js';
 import { db, auth } from './firebase.js';
-import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, onSnapshot, query, where } from './firebase.js';
+import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, onSnapshot, query, where, orderBy } from './firebase.js';
 import { compressImage, validateImage } from './imageUtils.js';
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================
@@ -896,37 +896,52 @@ async function initProfile() {
         });
     }
 
+    // ПРОДАЖИ - С СОРТИРОВКОЙ НОВЫЕ СВЕРХУ
     async function renderSales() {
         const container = document.getElementById('salesContent');
         if (!container) return;
-        const ordersSnapshot = await getDocs(query(collection(db, 'orders'), where('sellerId', '==', user.uid)));
-        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (orders.length === 0) {
-            container.innerHTML = '<div class="empty-state"><i class="fas fa-hand-holding-usd"></i><p>У вас пока нет продаж</p></div>';
-            return;
+        
+        try {
+            const ordersSnapshot = await getDocs(
+                query(
+                    collection(db, 'orders'), 
+                    where('sellerId', '==', user.uid),
+                    orderBy('createdAt', 'desc')
+                )
+            );
+            const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-hand-holding-usd"></i><p>У вас пока нет продаж</p></div>';
+                return;
+            }
+            
+            container.innerHTML = orders.map(o => `
+                <div class="order-card">
+                    <div class="order-header">
+                        <div>
+                            <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
+                            <div style="font-size: 13px; color: var(--color-text-muted);">Покупатель: ${o.buyerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
+                        </div>
+                        <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : o.status === 'cancelled' ? 'Отменено' : 'Завершено'}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        <div>
+                            <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
+                            <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            ${o.status === 'pending' ? `<button class="btn btn-success" onclick="window.confirmSale('${o.id}', '${o.productId}', ${o.quantity})"><i class="fas fa-check"></i> Подтвердить продажу</button>` : ''}
+                            ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelSale('${o.id}', '${o.productId}', ${o.quantity})"><i class="fas fa-times"></i> Отменить</button>` : ''}
+                            <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Ошибка загрузки продаж:', error);
+            container.innerHTML = '<div class="empty-state"><p>Ошибка загрузки продаж</p></div>';
         }
-        container.innerHTML = orders.map(o => `
-            <div class="order-card">
-                <div class="order-header">
-                    <div>
-                        <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
-                        <div style="font-size: 13px; color: var(--color-text-muted);">Покупатель: ${o.buyerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
-                    </div>
-                    <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : o.status === 'cancelled' ? 'Отменено' : 'Завершено'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                    <div>
-                        <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
-                        <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
-                    </div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        ${o.status === 'pending' ? `<button class="btn btn-success" onclick="window.confirmSale('${o.id}', '${o.productId}', ${o.quantity})"><i class="fas fa-check"></i> Подтвердить продажу</button>` : ''}
-                        ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelSale('${o.id}', '${o.productId}', ${o.quantity})"><i class="fas fa-times"></i> Отменить</button>` : ''}
-                        <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат</button>
-                    </div>
-                </div>
-            </div>
-        `).join('');
     }
 
     window.confirmSale = async function(orderId, productId, quantity) {
@@ -975,36 +990,51 @@ async function initProfile() {
 
     renderSales();
 
+    // ПОКУПКИ - С СОРТИРОВКОЙ НОВЫЕ СВЕРХУ
     async function renderPurchases() {
         const container = document.getElementById('purchasesContent');
         if (!container) return;
-        const ordersSnapshot = await getDocs(query(collection(db, 'orders'), where('buyerId', '==', user.uid)));
-        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (orders.length === 0) {
-            container.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-bag"></i><p>У вас пока нет покупок</p></div>';
-            return;
+        
+        try {
+            const ordersSnapshot = await getDocs(
+                query(
+                    collection(db, 'orders'), 
+                    where('buyerId', '==', user.uid),
+                    orderBy('createdAt', 'desc')
+                )
+            );
+            const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-bag"></i><p>У вас пока нет покупок</p></div>';
+                return;
+            }
+            
+            container.innerHTML = orders.map(o => `
+                <div class="order-card">
+                    <div class="order-header">
+                        <div>
+                            <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
+                            <div style="font-size: 13px; color: var(--color-text-muted);">Продавец: ${o.sellerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
+                        </div>
+                        <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : o.status === 'cancelled' ? 'Отменено' : 'Завершено'}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        <div>
+                            <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
+                            <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelPurchase('${o.id}')"><i class="fas fa-times"></i> Отменить покупку</button>` : ''}
+                            <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат с продавцом</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Ошибка загрузки покупок:', error);
+            container.innerHTML = '<div class="empty-state"><p>Ошибка загрузки покупок</p></div>';
         }
-        container.innerHTML = orders.map(o => `
-            <div class="order-card">
-                <div class="order-header">
-                    <div>
-                        <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
-                        <div style="font-size: 13px; color: var(--color-text-muted);">Продавец: ${o.sellerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
-                    </div>
-                    <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : o.status === 'cancelled' ? 'Отменено' : 'Завершено'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                    <div>
-                        <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
-                        <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
-                    </div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelPurchase('${o.id}')"><i class="fas fa-times"></i> Отменить покупку</button>` : ''}
-                        <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат с продавцом</button>
-                    </div>
-                </div>
-            </div>
-        `).join('');
     }
 
     window.cancelPurchase = async function(orderId) {
