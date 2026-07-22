@@ -1,34 +1,52 @@
-// ==================== ДАННЫЕ ====================
-const DEFAULT_CATEGORIES = [
-    { id: 'blocks', name: 'Блоки', icon: 'fa-cube' },
-    { id: 'items', name: 'Предметы', icon: 'fa-gem' },
-    { id: 'mobs', name: 'Мобы', icon: 'fa-dragon' },
-    { id: 'services', name: 'Услуги', icon: 'fa-hands-helping' },
-    { id: 'other', name: 'Другое', icon: 'fa-ellipsis-h' }
-];
+import { getCurrentUser, logoutUser } from './auth.js';
+import { db, auth } from './firebase.js';
+import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, onSnapshot, query, where } from './firebase.js';
+import { compressImage, validateImage } from './imageUtils.js';
 
-function initData() {
-    if (!localStorage.getItem('categories')) localStorage.setItem('categories', JSON.stringify(DEFAULT_CATEGORIES));
-    if (!localStorage.getItem('products')) localStorage.setItem('products', JSON.stringify([]));
-    if (!localStorage.getItem('users')) localStorage.setItem('users', JSON.stringify([]));
-    if (!localStorage.getItem('orders')) localStorage.setItem('orders', JSON.stringify([]));
-    if (!localStorage.getItem('chats')) localStorage.setItem('chats', JSON.stringify([]));
-    if (!localStorage.getItem('reports')) localStorage.setItem('reports', JSON.stringify([]));
-    if (!localStorage.getItem('cart')) localStorage.setItem('cart', JSON.stringify([]));
-    if (!localStorage.getItem('currentUser')) localStorage.setItem('currentUser', 'null');
+// Инициализация категорий при первом запуске
+async function initCategories() {
+    const categoriesRef = collection(db, 'categories');
+    const snapshot = await getDocs(categoriesRef);
+    
+    if (snapshot.empty) {
+        const defaultCategories = [
+            { id: 'blocks', name: 'Блоки', icon: 'fa-cube' },
+            { id: 'items', name: 'Предметы', icon: 'fa-gem' },
+            { id: 'mobs', name: 'Мобы', icon: 'fa-dragon' },
+            { id: 'services', name: 'Услуги', icon: 'fa-hands-helping' },
+            { id: 'other', name: 'Другое', icon: 'fa-ellipsis-h' }
+        ];
+        
+        for (const cat of defaultCategories) {
+            await setDoc(doc(db, 'categories', cat.id), cat);
+        }
+    }
 }
 
-function getData(key) { return JSON.parse(localStorage.getItem(key) || '[]'); }
-function setData(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
-function getCurrentUser() {
-    const u = localStorage.getItem('currentUser');
-    return u === 'null' ? null : JSON.parse(u);
+// Загрузка изображения
+async function handleImageUpload(file, maxSize = 800) {
+    const error = validateImage(file);
+    if (error) { 
+        alert(error); 
+        return null; 
+    }
+    
+    try {
+        const base64 = await compressImage(file, maxSize, maxSize, 0.7);
+        return base64;
+    } catch (err) {
+        alert('Ошибка загрузки изображения');
+        console.error(err);
+        return null;
+    }
 }
 
 // ==================== АНИМАЦИИ ====================
 function initScrollAnimations() {
     const obs = new IntersectionObserver((entries) => {
-        entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+        entries.forEach(e => { 
+            if (e.isIntersecting) e.target.classList.add('visible'); 
+        });
     }, { threshold: 0.1 });
     document.querySelectorAll('.animate-on-scroll').forEach(el => obs.observe(el));
 }
@@ -44,8 +62,14 @@ function updateHeader() {
 
     if (user) {
         if (loginBtn) loginBtn.classList.add('hidden');
-        if (profileBtn) { profileBtn.classList.remove('hidden'); if (userName) userName.textContent = user.name; }
-        if (logoutBtn) logoutBtn.classList.remove('hidden');
+        if (profileBtn) { 
+            profileBtn.classList.remove('hidden'); 
+            if (userName) userName.textContent = user.displayName || 'Профиль'; 
+        }
+        if (logoutBtn) {
+            logoutBtn.classList.remove('hidden');
+            logoutBtn.onclick = () => logoutUser();
+        }
     } else {
         if (loginBtn) loginBtn.classList.remove('hidden');
         if (profileBtn) profileBtn.classList.add('hidden');
@@ -53,18 +77,23 @@ function updateHeader() {
     }
 
     if (cartCount) {
-        const cart = getData('cart');
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
         const total = cart.reduce((s, i) => s + i.quantity, 0);
         cartCount.textContent = total;
     }
 }
 
+window.updateHeaderCallback = updateHeader;
+
 // ==================== КАТЕГОРИИ ====================
-function renderCategories(containerId) {
+async function renderCategories(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    const categories = getData('categories');
-    container.innerHTML = categories.map(cat => `
+    
+    const categories = await getDocs(collection(db, 'categories'));
+    const cats = categories.docs.map(doc => doc.data());
+    
+    container.innerHTML = cats.map(cat => `
         <a href="catalog.html?category=${cat.id}" class="category-card">
             <div class="category-icon"><i class="fas ${cat.icon}"></i></div>
             <span>${cat.name}</span>
@@ -99,10 +128,10 @@ function renderProducts(containerId, products = []) {
                 ${p.delivery ? `<div class="product-delivery"><i class="fas fa-truck"></i> ${p.delivery}</div>` : ''}
                 <div class="product-seller"><i class="fas fa-store"></i> ${p.sellerName || 'Неизвестно'}</div>
                 <div style="margin-top: 12px; display: flex; gap: 8px;">
-                    ${getCurrentUser() && getCurrentUser().id !== p.sellerId && p.quantity > 0 ? 
-                        `<button class="btn btn-primary btn-small" onclick="event.stopPropagation(); buyProductDirect(${p.id})" style="flex: 1;"><i class="fas fa-bolt"></i> Купить</button>` : ''}
-                    ${getCurrentUser() && getCurrentUser().id !== p.sellerId ? 
-                        `<button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); contactAboutProduct(${p.id})" style="flex: 1;"><i class="fas fa-comment"></i> Написать</button>` : ''}
+                    ${getCurrentUser() && getCurrentUser().uid !== p.sellerId && p.quantity > 0 ? 
+                        `<button class="btn btn-primary btn-small" onclick="event.stopPropagation(); window.buyProductDirect('${p.id}')" style="flex: 1;"><i class="fas fa-bolt"></i> Купить</button>` : ''}
+                    ${getCurrentUser() && getCurrentUser().uid !== p.sellerId ? 
+                        `<button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); window.contactAboutProduct('${p.id}')" style="flex: 1;"><i class="fas fa-comment"></i> Написать</button>` : ''}
                 </div>
             </div>
         </div>
@@ -110,61 +139,68 @@ function renderProducts(containerId, products = []) {
 
     container.querySelectorAll('.product-card').forEach(card => {
         card.addEventListener('click', () => {
-            const id = parseInt(card.dataset.id);
-            const products = getData('products');
+            const id = card.dataset.id;
             const product = products.find(p => p.id === id);
             if (product) showProductModal(product);
         });
     });
 }
 
-window.buyProductDirect = function(productId) {
-    const products = getData('products');
-    const product = products.find(p => p.id === productId);
-    if (product) buyProduct(product);
-};
-
-window.contactAboutProduct = function(productId) {
-    const products = getData('products');
-    const product = products.find(p => p.id === productId);
-    if (product) {
-        const user = getCurrentUser();
-        if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
-        
-        const chats = getData('chats');
-        const existingChat = chats.find(c => 
-            (c.buyerId === user.id && c.sellerId === product.sellerId && c.productId === productId) ||
-            (c.sellerId === user.id && c.buyerId === product.sellerId && c.productId === productId)
-        );
-        
-        if (existingChat) {
-            window.location.href = `chat.html?chatId=${existingChat.id}`;
-        } else {
-            const chat = {
-                id: Date.now(),
-                orderId: null,
-                buyerId: user.id,
-                sellerId: product.sellerId,
-                productId: product.id,
-                productTitle: product.title,
-                productImage: product.image || null,
-                productIcon: product.icon || 'fa-cube',
-                productPrice: product.price,
-                messages: [{
-                    id: 1,
-                    userId: user.id,
-                    text: `Здравствуйте! Интересует "${product.title}". Есть вопросы по товару.`,
-                    time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-                }]
-            };
-            chats.push(chat);
-            setData('chats', chats);
-            window.location.href = `chat.html?chatId=${chat.id}`;
-        }
+// Покупка товара
+window.buyProductDirect = async function(productId) {
+    const productDoc = await getDoc(doc(db, 'products', productId));
+    if (productDoc.exists()) {
+        const product = { id: productDoc.id, ...productDoc.data() };
+        buyProduct(product);
     }
 };
 
-// ==================== МОДАЛКА ТОВАРА ====================
+// Написать продавцу
+window.contactAboutProduct = async function(productId) {
+    const productDoc = await getDoc(doc(db, 'products', productId));
+    if (!productDoc.exists()) return;
+    
+    const product = { id: productDoc.id, ...productDoc.data() };
+    const user = getCurrentUser();
+    
+    if (!user) { 
+        alert('Войдите в аккаунт'); 
+        window.location.href = 'login.html'; 
+        return; 
+    }
+    
+    const chats = await getDocs(collection(db, 'chats'));
+    const existingChat = chats.docs.find(c => {
+        const data = c.data();
+        return (data.buyerId === user.uid && data.sellerId === product.sellerId && data.productId === productId) ||
+               (data.sellerId === user.uid && data.buyerId === product.sellerId && data.productId === productId);
+    });
+    
+    if (existingChat) {
+        window.location.href = `chat.html?chatId=${existingChat.id}`;
+    } else {
+        const chatRef = await addDoc(collection(db, 'chats'), {
+            orderId: null,
+            buyerId: user.uid,
+            sellerId: product.sellerId,
+            productId: productId,
+            productTitle: product.title,
+            productImage: product.image || null,
+            productIcon: product.icon || 'fa-cube',
+            productPrice: product.price,
+            messages: [{
+                id: 1,
+                userId: user.uid,
+                text: `Здравствуйте! Интересует "${product.title}". Есть вопросы по товару.`,
+                time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+            }],
+            createdAt: new Date().toISOString()
+        });
+        window.location.href = `chat.html?chatId=${chatRef.id}`;
+    }
+};
+
+// Модалка товара
 function showProductModal(product) {
     const user = getCurrentUser();
     const existing = document.getElementById('productModal');
@@ -192,11 +228,11 @@ function showProductModal(product) {
                 ${product.delivery ? `<p style="color: var(--color-text-secondary); margin-bottom: 20px;"><i class="fas fa-truck" style="color: var(--color-lime);"></i> ${product.delivery}</p>` : ''}
                 <p style="color: var(--color-text-muted); margin-bottom: 20px;"><i class="fas fa-store"></i> Продавец: ${product.sellerName || 'Неизвестно'}</p>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    ${user && user.id !== product.sellerId && product.quantity > 0 ? `<button class="btn btn-primary" id="buyNowBtn"><i class="fas fa-bolt"></i> Купить сейчас</button>` : ''}
-                    ${user && user.id !== product.sellerId && product.quantity > 0 ? `<button class="btn btn-secondary" id="addToCartBtn"><i class="fas fa-cart-plus"></i> В корзину</button>` : ''}
-                    ${user && user.id !== product.sellerId ? `<button class="btn btn-secondary" id="contactBtn"><i class="fas fa-comment"></i> Написать по поводу товара</button>` : ''}
-                    ${user && user.id !== product.sellerId ? `<button class="btn btn-danger" id="reportProductBtn"><i class="fas fa-flag"></i> Пожаловаться</button>` : ''}
-                    ${user && user.id === product.sellerId ? `<button class="btn btn-danger" id="deleteMyProductBtn"><i class="fas fa-trash"></i> Удалить товар</button>` : ''}
+                    ${user && user.uid !== product.sellerId && product.quantity > 0 ? `<button class="btn btn-primary" id="buyNowBtn"><i class="fas fa-bolt"></i> Купить сейчас</button>` : ''}
+                    ${user && user.uid !== product.sellerId && product.quantity > 0 ? `<button class="btn btn-secondary" id="addToCartBtn"><i class="fas fa-cart-plus"></i> В корзину</button>` : ''}
+                    ${user && user.uid !== product.sellerId ? `<button class="btn btn-secondary" id="contactBtn"><i class="fas fa-comment"></i> Написать по поводу товара</button>` : ''}
+                    ${user && user.uid !== product.sellerId ? `<button class="btn btn-danger" id="reportProductBtn"><i class="fas fa-flag"></i> Пожаловаться</button>` : ''}
+                    ${user && user.uid === product.sellerId ? `<button class="btn btn-danger" id="deleteMyProductBtn"><i class="fas fa-trash"></i> Удалить товар</button>` : ''}
                 </div>
             </div>
         </div>
@@ -208,19 +244,25 @@ function showProductModal(product) {
 
     const buyNowBtn = document.getElementById('buyNowBtn');
     if (buyNowBtn) {
-        buyNowBtn.onclick = () => { modal.remove(); buyProduct(product); };
+        buyNowBtn.onclick = () => { 
+            modal.remove(); 
+            buyProduct(product); 
+        };
     }
 
     const addToCartBtn = document.getElementById('addToCartBtn');
     if (addToCartBtn) {
-        addToCartBtn.onclick = () => { addToCart(product); modal.remove(); };
+        addToCartBtn.onclick = () => { 
+            addToCart(product); 
+            modal.remove(); 
+        };
     }
 
     const contactBtn = document.getElementById('contactBtn');
     if (contactBtn) {
         contactBtn.onclick = () => {
             modal.remove();
-            contactAboutProduct(product.id);
+            window.contactAboutProduct(product.id);
         };
     }
 
@@ -238,10 +280,9 @@ function showProductModal(product) {
 
     const deleteMyProductBtn = document.getElementById('deleteMyProductBtn');
     if (deleteMyProductBtn) {
-        deleteMyProductBtn.onclick = () => {
+        deleteMyProductBtn.onclick = async () => {
             if (confirm('Удалить товар?')) {
-                const products = getData('products').filter(p => p.id !== product.id);
-                setData('products', products);
+                await deleteDoc(doc(db, 'products', product.id));
                 alert('Товар удалён');
                 modal.remove();
                 location.reload();
@@ -250,19 +291,30 @@ function showProductModal(product) {
     }
 }
 
-// ==================== ПОКУПКА ====================
-function buyProduct(product) {
+// Покупка товара
+async function buyProduct(product) {
     const user = getCurrentUser();
-    if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
-    if (product.quantity <= 0) { alert('Товар закончился'); return; }
-    if (product.sellerId === user.id) { alert('Нельзя купить свой товар'); return; }
+    if (!user) { 
+        alert('Войдите в аккаунт'); 
+        window.location.href = 'login.html'; 
+        return; 
+    }
+    if (product.quantity <= 0) { 
+        alert('Товар закончился'); 
+        return; 
+    }
+    if (product.sellerId === user.uid) { 
+        alert('Нельзя купить свой товар'); 
+        return; 
+    }
 
     const quantity = parseInt(prompt(`Сколько штук купить? (доступно: ${product.quantity})`, '1'));
-    if (!quantity || quantity <= 0 || quantity > product.quantity) { alert('Неверное количество'); return; }
+    if (!quantity || quantity <= 0 || quantity > product.quantity) { 
+        alert('Неверное количество'); 
+        return; 
+    }
 
-    const orders = getData('orders');
     const order = {
-        id: Date.now(),
         productId: product.id,
         productTitle: product.title,
         productImage: product.image || null,
@@ -270,21 +322,20 @@ function buyProduct(product) {
         price: product.price,
         quantity: quantity,
         total: product.price * quantity,
-        buyerId: user.id,
-        buyerName: user.name,
+        buyerId: user.uid,
+        buyerName: user.displayName || user.email,
         sellerId: product.sellerId,
         sellerName: product.sellerName,
         status: 'pending',
         createdAt: new Date().toISOString()
     };
-    orders.push(order);
-    setData('orders', orders);
+    
+    const orderRef = await addDoc(collection(db, 'orders'), order);
 
-    const chats = getData('chats');
-    const chat = {
-        id: Date.now(),
-        orderId: order.id,
-        buyerId: user.id,
+    // Создаём чат
+    const chatRef = await addDoc(collection(db, 'chats'), {
+        orderId: orderRef.id,
+        buyerId: user.uid,
         sellerId: product.sellerId,
         productId: product.id,
         productTitle: product.title,
@@ -293,190 +344,51 @@ function buyProduct(product) {
         productPrice: product.price,
         messages: [{
             id: 1,
-            userId: user.id,
+            userId: user.uid,
             text: `Здравствуйте! Я купил "${product.title}" (${quantity} шт). Жду подтверждения.`,
             time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-        }]
-    };
-    chats.push(chat);
-    setData('chats', chats);
+        }],
+        createdAt: new Date().toISOString()
+    });
 
     alert('Заказ оформлен! Чат с продавцом открыт.');
-    window.location.href = `chat.html?chatId=${chat.id}`;
+    window.location.href = `chat.html?chatId=${chatRef.id}`;
 }
 
+// Добавление в корзину
 function addToCart(product) {
     const user = getCurrentUser();
-    if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
-    if (product.quantity <= 0) { alert('Товар закончился'); return; }
+    if (!user) { 
+        alert('Войдите в аккаунт'); 
+        window.location.href = 'login.html'; 
+        return; 
+    }
+    if (product.quantity <= 0) { 
+        alert('Товар закончился'); 
+        return; 
+    }
 
-    const cart = getData('cart');
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     const existing = cart.find(i => i.productId === product.id);
+    
     if (existing) {
-        if (existing.quantity < product.quantity) existing.quantity++;
-        else { alert('Достигнуто максимальное количество'); return; }
+        if (existing.quantity < product.quantity) {
+            existing.quantity++;
+        } else { 
+            alert('Достигнуто максимальное количество'); 
+            return; 
+        }
     } else {
         cart.push({ productId: product.id, quantity: 1 });
     }
-    setData('cart', cart);
+    
+    localStorage.setItem('cart', JSON.stringify(cart));
     updateHeader();
     alert('Товар добавлен в корзину');
 }
 
-// ==================== КОРЗИНА ====================
-function initCart() {
-    const cartItemsEl = document.getElementById('cartItems');
-    const cartSummary = document.getElementById('cartSummary');
-    const cartTotal = document.getElementById('cartTotal');
-    const checkoutBtn = document.getElementById('checkoutBtn');
-
-    if (!cartItemsEl) return;
-
-    const user = getCurrentUser();
-    if (!user) { cartItemsEl.innerHTML = '<div class="empty-state"><p>Войдите, чтобы использовать корзину</p></div>'; return; }
-
-    const cart = getData('cart');
-    const products = getData('products');
-
-    if (cart.length === 0) {
-        cartItemsEl.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-cart"></i><p>Корзина пуста</p></div>';
-        return;
-    }
-
-    let total = 0;
-    cartItemsEl.innerHTML = cart.map(item => {
-        const p = products.find(x => x.id === item.productId);
-        if (!p) return '';
-        const subtotal = p.price * item.quantity;
-        total += subtotal;
-        return `
-            <div class="cart-item">
-                <div class="cart-item-image">${p.image ? `<img src="${p.image}">` : `<i class="fas ${p.icon || 'fa-cube'}"></i>`}</div>
-                <div class="cart-item-info">
-                    <div class="cart-item-title">${p.title}</div>
-                    <div class="cart-item-price">${p.price.toLocaleString('ru-RU')} АР × ${item.quantity} = ${subtotal.toLocaleString('ru-RU')} АР</div>
-                    <div style="font-size: 12px; color: var(--color-text-muted);">Продавец: ${p.sellerName}</div>
-                </div>
-                <div class="cart-item-controls">
-                    <div class="quantity-control">
-                        <button class="quantity-btn" onclick="changeCartQty(${p.id}, -1)">-</button>
-                        <span class="quantity-value">${item.quantity}</span>
-                        <button class="quantity-btn" onclick="changeCartQty(${p.id}, 1)">+</button>
-                    </div>
-                    <button class="btn btn-danger btn-small" onclick="removeFromCart(${p.id})"><i class="fas fa-trash"></i></button>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    cartTotal.textContent = total.toLocaleString('ru-RU') + ' АР';
-    cartSummary.style.display = 'flex';
-
-    if (checkoutBtn) {
-        checkoutBtn.onclick = () => checkoutCart();
-    }
-}
-
-window.changeCartQty = function(productId, delta) {
-    const cart = getData('cart');
-    const item = cart.find(i => i.productId === productId);
-    const product = getData('products').find(p => p.id === productId);
-    if (!item || !product) return;
-
-    item.quantity += delta;
-    if (item.quantity <= 0) {
-        const idx = cart.indexOf(item);
-        cart.splice(idx, 1);
-    } else if (item.quantity > product.quantity) {
-        item.quantity = product.quantity;
-        alert('Достигнуто максимальное количество');
-    }
-    setData('cart', cart);
-    updateHeader();
-    initCart();
-};
-
-window.removeFromCart = function(productId) {
-    const cart = getData('cart').filter(i => i.productId !== productId);
-    setData('cart', cart);
-    updateHeader();
-    initCart();
-};
-
-function checkoutCart() {
-    const user = getCurrentUser();
-    if (!user) return;
-
-    const cart = getData('cart');
-    const products = getData('products');
-    const orders = getData('orders');
-    const chats = getData('chats');
-
-    if (cart.length === 0) return;
-
-    let total = 0;
-    const newOrders = [];
-    const newChats = [];
-
-    cart.forEach(item => {
-        const p = products.find(x => x.id === item.productId);
-        if (!p || p.quantity < item.quantity) return;
-        if (p.sellerId === user.id) return;
-
-        const order = {
-            id: Date.now() + Math.random(),
-            productId: p.id,
-            productTitle: p.title,
-            productImage: p.image || null,
-            productIcon: p.icon || 'fa-cube',
-            price: p.price,
-            quantity: item.quantity,
-            total: p.price * item.quantity,
-            buyerId: user.id,
-            buyerName: user.name,
-            sellerId: p.sellerId,
-            sellerName: p.sellerName,
-            status: 'pending',
-            createdAt: new Date().toISOString()
-        };
-        newOrders.push(order);
-        total += order.total;
-
-        const chat = {
-            id: Date.now() + Math.random(),
-            orderId: order.id,
-            buyerId: user.id,
-            sellerId: p.sellerId,
-            productId: p.id,
-            productTitle: p.title,
-            productImage: p.image || null,
-            productIcon: p.icon || 'fa-cube',
-            productPrice: p.price,
-            messages: [{
-                id: 1,
-                userId: user.id,
-                text: `Здравствуйте! Я купил "${p.title}" (${item.quantity} шт). Жду подтверждения.`,
-                time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-            }]
-        };
-        newChats.push(chat);
-    });
-
-    if (newOrders.length === 0) { alert('Нет доступных товаров для покупки'); return; }
-
-    orders.push(...newOrders);
-    chats.push(...newChats);
-    setData('orders', orders);
-    setData('chats', chats);
-    setData('cart', []);
-
-    alert(`Заказ оформлен! Сумма: ${total.toLocaleString('ru-RU')} АР`);
-    updateHeader();
-    window.location.href = `chat.html?chatId=${newChats[0].id}`;
-}
-
-// ==================== КАТАЛОГ ====================
-function initCatalog() {
+// Инициализация каталога
+async function initCatalog() {
     const searchInput = document.getElementById('searchInput');
     const categoryFilters = document.getElementById('categoryFilters');
     const minPrice = document.getElementById('minPrice');
@@ -489,8 +401,10 @@ function initCatalog() {
     if (!productsGrid) return;
 
     if (categoryFilters) {
-        const categories = getData('categories');
-        categoryFilters.innerHTML = categories.map(cat => `
+        const categories = await getDocs(collection(db, 'categories'));
+        const cats = categories.docs.map(doc => doc.data());
+        
+        categoryFilters.innerHTML = cats.map(cat => `
             <label><input type="checkbox" value="${cat.id}" class="category-checkbox"> ${cat.name}</label>
         `).join('');
     }
@@ -501,8 +415,10 @@ function initCatalog() {
 
     if (urlSearch && searchInput) searchInput.value = urlSearch;
 
-    function loadAndRender() {
-        let products = getData('products');
+    async function loadAndRender() {
+        const productsSnapshot = await getDocs(collection(db, 'products'));
+        let products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
         const selectedCategories = Array.from(document.querySelectorAll('.category-checkbox:checked')).map(cb => cb.value);
         const search = (searchInput?.value || '').toLowerCase();
         const min = parseFloat(minPrice?.value) || 0;
@@ -545,8 +461,19 @@ function initCatalog() {
     loadAndRender();
 }
 
-// ==================== ПРОФИЛЬ ====================
-function initProfile() {
+// Инициализация профиля
+async function initProfile() {
+    const user = getCurrentUser();
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // Загрузка данных пользователя
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const userData = userDoc.exists() ? userDoc.data() : {};
+
+    // Навигация по вкладкам
     const navLinks = document.querySelectorAll('.profile-nav-link');
     const sections = document.querySelectorAll('.profile-section');
 
@@ -561,51 +488,39 @@ function initProfile() {
         });
     });
 
-    const user = getCurrentUser();
-    if (!user) return;
-
-    const sidebarName = document.getElementById('sidebarUserName');
-    if (sidebarName) sidebarName.textContent = user.name;
-
-    const avatarDisplay = document.getElementById('userAvatarDisplay');
-    if (avatarDisplay && user.avatar) {
-        avatarDisplay.innerHTML = `<img src="${user.avatar}" alt="avatar">`;
-    }
-
+    // Заполнение формы профиля
     const nameInput = document.getElementById('profileName');
     const emailInput = document.getElementById('profileEmail');
     const phoneInput = document.getElementById('profilePhone');
     const bioInput = document.getElementById('profileBio');
+    const sidebarUserName = document.getElementById('sidebarUserName');
 
-    if (nameInput) nameInput.value = user.name || '';
+    if (nameInput) nameInput.value = userData.name || user.displayName || '';
     if (emailInput) emailInput.value = user.email || '';
-    if (phoneInput) phoneInput.value = user.phone || '';
-    if (bioInput) bioInput.value = user.bio || '';
+    if (phoneInput) phoneInput.value = userData.phone || '';
+    if (bioInput) bioInput.value = userData.bio || '';
+    if (sidebarUserName) sidebarUserName.textContent = userData.name || user.displayName || 'Пользователь';
 
-    renderMyProducts(user);
-    renderSales(user);
-    renderPurchases(user);
-
+    // Сохранение профиля
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
-        profileForm.addEventListener('submit', (e) => {
+        profileForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const users = getData('users');
-            const idx = users.findIndex(u => u.id === user.id);
-            if (idx !== -1) {
-                users[idx].name = document.getElementById('profileName').value;
-                users[idx].email = document.getElementById('profileEmail').value;
-                users[idx].phone = document.getElementById('profilePhone').value;
-                users[idx].bio = document.getElementById('profileBio').value;
-                setData('users', users);
-                localStorage.setItem('currentUser', JSON.stringify(users[idx]));
-                alert('Профиль сохранён');
-                updateHeader();
-                if (sidebarName) sidebarName.textContent = users[idx].name;
+            
+            await updateDoc(doc(db, 'users', user.uid), {
+                name: document.getElementById('profileName').value,
+                phone: document.getElementById('profilePhone').value,
+                bio: document.getElementById('profileBio').value
+            });
+            
+            alert('Профиль сохранён');
+            if (sidebarUserName) {
+                sidebarUserName.textContent = document.getElementById('profileName').value;
             }
         });
     }
 
+    // Загрузка аватарки и фона
     const avatarInput = document.getElementById('avatarInput');
     const bgInput = document.getElementById('bgInput');
     const previewAvatar = document.getElementById('previewAvatar');
@@ -614,35 +529,39 @@ function initProfile() {
     const removeBgBtn = document.getElementById('removeBgBtn');
     const saveAppearanceBtn = document.getElementById('saveAppearanceBtn');
 
-    let tempAvatar = user.avatar;
-    let tempBg = user.background;
+    let tempAvatar = userData.avatar;
+    let tempBg = userData.background;
 
-    if (previewAvatar && user.avatar) previewAvatar.innerHTML = `<img src="${user.avatar}" style="width: 100%; height: 100%; object-fit: cover;">`;
-    if (previewBg && user.background) previewBg.innerHTML = `<img src="${user.background}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    if (previewAvatar && userData.avatar) {
+        previewAvatar.innerHTML = `<img src="${userData.avatar}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    }
+    if (previewBg && userData.background) {
+        previewBg.innerHTML = `<img src="${userData.background}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    }
 
     if (avatarInput) {
-        avatarInput.addEventListener('change', (e) => {
+        avatarInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                tempAvatar = ev.target.result;
-                previewAvatar.innerHTML = `<img src="${tempAvatar}" style="width: 100%; height: 100%; object-fit: cover;">`;
-            };
-            reader.readAsDataURL(file);
+            
+            const base64 = await handleImageUpload(file, 400);
+            if (base64) {
+                tempAvatar = base64;
+                previewAvatar.innerHTML = `<img src="${base64}" style="width: 100%; height: 100%; object-fit: cover;">`;
+            }
         });
     }
 
     if (bgInput) {
-        bgInput.addEventListener('change', (e) => {
+        bgInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                tempBg = ev.target.result;
-                previewBg.innerHTML = `<img src="${tempBg}" style="width: 100%; height: 100%; object-fit: cover;">`;
-            };
-            reader.readAsDataURL(file);
+            
+            const base64 = await handleImageUpload(file, 1200);
+            if (base64) {
+                tempBg = base64;
+                previewBg.innerHTML = `<img src="${base64}" style="width: 100%; height: 100%; object-fit: cover;">`;
+            }
         });
     }
 
@@ -663,26 +582,24 @@ function initProfile() {
     }
 
     if (saveAppearanceBtn) {
-        saveAppearanceBtn.onclick = () => {
-            const users = getData('users');
-            const idx = users.findIndex(u => u.id === user.id);
-            if (idx !== -1) {
-                users[idx].avatar = tempAvatar;
-                users[idx].background = tempBg;
-                setData('users', users);
-                localStorage.setItem('currentUser', JSON.stringify(users[idx]));
-                alert('Внешний вид сохранён');
-                location.reload();
-            }
+        saveAppearanceBtn.onclick = async () => {
+            await updateDoc(doc(db, 'users', user.uid), {
+                avatar: tempAvatar,
+                background: tempBg
+            });
+            alert('Внешний вид сохранён');
+            location.reload();
         };
     }
 
+    // Добавление товара
     const addProductForm = document.getElementById('addProductForm');
     if (addProductForm) {
         const categorySelect = document.getElementById('productCategory');
         if (categorySelect) {
-            const categories = getData('categories');
-            categorySelect.innerHTML = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            const categories = await getDocs(collection(db, 'categories'));
+            const cats = categories.docs.map(doc => doc.data());
+            categorySelect.innerHTML = cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         }
 
         const productImageInput = document.getElementById('productImage');
@@ -690,20 +607,21 @@ function initProfile() {
         let tempProductImage = null;
 
         if (productImageInput) {
-            productImageInput.addEventListener('change', (e) => {
+            productImageInput.addEventListener('change', async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    tempProductImage = ev.target.result;
-                    imagePreview.innerHTML = `<img src="${tempProductImage}" style="max-width: 200px; border-radius: var(--radius-sm); border: 2px solid var(--color-border);">`;
-                };
-                reader.readAsDataURL(file);
+                
+                const base64 = await handleImageUpload(file, 800);
+                if (base64) {
+                    tempProductImage = base64;
+                    imagePreview.innerHTML = `<img src="${base64}" style="max-width: 200px; border-radius: var(--radius-sm); border: 2px solid var(--color-border);">`;
+                }
             });
         }
 
-        addProductForm.addEventListener('submit', (e) => {
+        addProductForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const title = document.getElementById('productTitle').value.trim();
             const category = document.getElementById('productCategory').value;
             const price = parseFloat(document.getElementById('productPrice').value);
@@ -711,67 +629,127 @@ function initProfile() {
             const description = document.getElementById('productDescription').value;
             const delivery = document.getElementById('productDelivery').value;
 
-            if (!title || !price || isNaN(quantity)) { alert('Заполните обязательные поля'); return; }
+            if (!title || !price || isNaN(quantity)) { 
+                alert('Заполните обязательные поля'); 
+                return; 
+            }
 
-            const products = getData('products');
-            const categories = getData('categories');
-            const cat = categories.find(c => c.id === category);
+            const categories = await getDocs(collection(db, 'categories'));
+            const cats = categories.docs.map(doc => doc.data());
+            const cat = cats.find(c => c.id === category);
 
-            const newProduct = {
-                id: Date.now(),
-                title, price, category,
+            const productData = {
+                title,
+                price,
+                category,
                 categoryName: cat?.name || category,
-                description, quantity, delivery,
-                sellerId: user.id,
-                sellerName: user.name,
+                description,
+                quantity,
+                delivery,
+                sellerId: user.uid,
+                sellerName: userData.name || user.displayName || user.email,
                 icon: cat?.icon || 'fa-cube',
                 image: tempProductImage,
                 createdAt: new Date().toISOString()
             };
 
-            products.push(newProduct);
-            setData('products', products);
+            await addDoc(collection(db, 'products'), productData);
             alert('Товар добавлен!');
             addProductForm.reset();
             imagePreview.innerHTML = '';
             tempProductImage = null;
-            renderMyProducts(user);
+            renderMyProducts();
         });
     }
 
-    loadDeliverySettings(user);
+    // Мои товары
+    async function renderMyProducts() {
+        const grid = document.getElementById('myProductsGrid');
+        if (!grid) return;
+        
+        const productsSnapshot = await getDocs(query(collection(db, 'products'), where('sellerId', '==', user.uid)));
+        const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        if (products.length === 0) {
+            grid.innerHTML = '<div class="empty-state"><i class="fas fa-box-open"></i><p>У вас нет товаров. Добавьте первый!</p></div>';
+            return;
+        }
+        
+        renderProducts('myProductsGrid', products);
+    }
+
+    renderMyProducts();
+
+    // Настройки доставки с координатами Minecraft
     const deliveryForm = document.getElementById('deliveryForm');
     if (deliveryForm) {
-        deliveryForm.addEventListener('submit', (e) => {
+        const courierEnabled = document.getElementById('courierEnabled');
+        const courierPrice = document.getElementById('courierPrice');
+        const courierTime = document.getElementById('courierTime');
+
+        if (userData.deliveryMethods) {
+            const courier = userData.deliveryMethods.find(m => m.type === 'courier');
+            if (courier) {
+                courierEnabled.checked = true;
+                courierPrice.value = courier.price;
+                courierTime.value = courier.time || '';
+            }
+
+            const pickupPoints = userData.deliveryMethods.filter(m => m.type === 'pickup');
+            const container = document.getElementById('pickupPointsContainer');
+            if (container) {
+                container.innerHTML = '';
+                pickupPoints.forEach(point => {
+                    const div = document.createElement('div');
+                    div.className = 'pickup-point';
+                    div.innerHTML = `
+                        <div class="pickup-point-header">
+                            <label class="checkbox-label"><input type="checkbox" class="pickup-enabled" checked><span>Активен</span></label>
+                            <button type="button" class="btn-remove" onclick="this.closest('.pickup-point').remove()"><i class="fas fa-trash"></i></button>
+                        </div>
+                        <div class="form-group"><label>Название</label><input type="text" class="pickup-name" value="${point.name}" required></div>
+                        <div class="form-group">
+                            <label>Координаты (X Y Z)</label>
+                            <input type="text" class="pickup-coords" value="${point.coords || ''}" placeholder="100 64 -200" required>
+                            <small class="form-hint">Например: 100 64 -200</small>
+                        </div>
+                        <div class="form-group"><label>Стоимость (АР)</label><input type="number" class="pickup-price" value="${point.price}" min="0" step="10"></div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+        }
+
+        deliveryForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const deliveryMethods = [];
-            const courierEnabled = document.getElementById('courierEnabled').checked;
-            if (courierEnabled) {
+            
+            if (courierEnabled.checked) {
                 deliveryMethods.push({
                     type: 'courier',
                     name: 'Курьерская доставка',
-                    price: parseFloat(document.getElementById('courierPrice').value) || 0,
-                    time: document.getElementById('courierTime').value
+                    price: parseFloat(courierPrice.value) || 0,
+                    time: courierTime.value
                 });
             }
+
             document.querySelectorAll('.pickup-point').forEach(point => {
                 if (point.querySelector('.pickup-enabled').checked) {
                     deliveryMethods.push({
                         type: 'pickup',
                         name: point.querySelector('.pickup-name').value,
-                        address: point.querySelector('.pickup-address').value,
+                        coords: point.querySelector('.pickup-coords').value,
                         price: parseFloat(point.querySelector('.pickup-price').value) || 0
                     });
                 }
             });
-            const users = getData('users');
-            const idx = users.findIndex(u => u.id === user.id);
-            if (idx !== -1) {
-                users[idx].deliveryMethods = deliveryMethods;
-                setData('users', users);
-                localStorage.setItem('currentUser', JSON.stringify(users[idx]));
-                alert('Настройки доставки сохранены');
-            }
+
+            await updateDoc(doc(db, 'users', user.uid), {
+                deliveryMethods
+            });
+            
+            alert('Настройки доставки сохранены');
         });
     }
 
@@ -786,195 +764,178 @@ function initProfile() {
                     <label class="checkbox-label"><input type="checkbox" class="pickup-enabled" checked><span>Активен</span></label>
                     <button type="button" class="btn-remove" onclick="this.closest('.pickup-point').remove()"><i class="fas fa-trash"></i></button>
                 </div>
-                <div class="form-group"><label>Название пункта</label><input type="text" class="pickup-name" placeholder="СДЭК, Почта России" required></div>
-                <div class="form-group"><label>Адрес</label><input type="text" class="pickup-address" placeholder="ул. Примерная, д. 1" required></div>
+                <div class="form-group"><label>Название пункта</label><input type="text" class="pickup-name" placeholder="Моя база" required></div>
+                <div class="form-group">
+                    <label>Координаты (X Y Z)</label>
+                    <input type="text" class="pickup-coords" placeholder="100 64 -200" required>
+                    <small class="form-hint">Например: 100 64 -200</small>
+                </div>
                 <div class="form-group"><label>Стоимость (АР)</label><input type="number" class="pickup-price" placeholder="0" min="0" step="10"></div>
             `;
             container.appendChild(point);
         });
     }
 
+    // Смена пароля
     const settingsForm = document.getElementById('settingsForm');
     if (settingsForm) {
-        settingsForm.addEventListener('submit', (e) => {
+        settingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const current = document.getElementById('currentPassword').value;
             const newPass = document.getElementById('newPassword').value;
             const confirm = document.getElementById('confirmPassword').value;
 
-            if (current !== user.password) { alert('Неверный текущий пароль'); return; }
-            if (newPass !== confirm) { alert('Пароли не совпадают'); return; }
-            if (newPass.length < 8) { alert('Минимум 8 символов'); return; }
-            if (!/[0-9]/.test(newPass)) { alert('Нужна цифра'); return; }
-            if (!/[A-ZА-ЯЁ]/.test(newPass)) { alert('Нужна заглавная буква'); return; }
+            // Для Firebase Auth нужна реавторизация для смены пароля
+            alert('Для смены пароля используйте функцию "Забыли пароль?" или войдите через Google');
+        });
+    }
 
-            const users = getData('users');
-            const idx = users.findIndex(u => u.id === user.id);
-            if (idx !== -1) {
-                users[idx].password = newPass;
-                setData('users', users);
-                localStorage.setItem('currentUser', JSON.stringify(users[idx]));
-                alert('Пароль изменён');
-                settingsForm.reset();
+    // Мои продажи
+    async function renderSales() {
+        const container = document.getElementById('salesContent');
+        if (!container) return;
+        
+        const ordersSnapshot = await getDocs(query(collection(db, 'orders'), where('sellerId', '==', user.uid)));
+        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        if (orders.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="fas fa-hand-holding-usd"></i><p>У вас пока нет продаж</p></div>';
+            return;
+        }
+        
+        container.innerHTML = orders.map(o => `
+            <div class="order-card">
+                <div class="order-header">
+                    <div>
+                        <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
+                        <div style="font-size: 13px; color: var(--color-text-muted);">Покупатель: ${o.buyerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
+                    </div>
+                    <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : 'Завершено'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div>
+                        <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
+                        <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        ${o.status === 'pending' ? `<button class="btn btn-success" onclick="window.confirmSale('${o.id}', '${o.productId}', ${o.quantity})"><i class="fas fa-check"></i> Подтвердить продажу</button>` : ''}
+                        <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    window.confirmSale = async function(orderId, productId, quantity) {
+        if (!confirm('Подтвердить продажу? Количество товара уменьшится.')) return;
+        
+        await updateDoc(doc(db, 'orders', orderId), { status: 'confirmed' });
+
+        const productDoc = await getDoc(doc(db, 'products', productId));
+        if (productDoc.exists()) {
+            const product = productDoc.data();
+            const newQuantity = product.quantity - quantity;
+            
+            if (newQuantity <= 0) {
+                await deleteDoc(doc(db, 'products', productId));
+            } else {
+                await updateDoc(doc(db, 'products', productId), { quantity: newQuantity });
             }
-        });
-    }
-}
-
-function renderMyProducts(user) {
-    const grid = document.getElementById('myProductsGrid');
-    if (!grid) return;
-    const products = getData('products').filter(p => p.sellerId === user.id);
-    if (products.length === 0) {
-        grid.innerHTML = '<div class="empty-state"><i class="fas fa-box-open"></i><p>У вас нет товаров. Добавьте первый!</p></div>';
-        return;
-    }
-    renderProducts('myProductsGrid', products);
-}
-
-function renderSales(user) {
-    const container = document.getElementById('salesContent');
-    if (!container) return;
-    const orders = getData('orders').filter(o => o.sellerId === user.id);
-    if (orders.length === 0) {
-        container.innerHTML = '<div class="empty-state"><i class="fas fa-hand-holding-usd"></i><p>У вас пока нет продаж</p></div>';
-        return;
-    }
-    container.innerHTML = orders.map(o => `
-        <div class="order-card">
-            <div class="order-header">
-                <div>
-                    <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
-                    <div style="font-size: 13px; color: var(--color-text-muted);">Покупатель: ${o.buyerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
-                </div>
-                <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : 'Завершено'}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                <div>
-                    <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
-                    <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    ${o.status === 'pending' ? `<button class="btn btn-success" onclick="confirmSale(${o.id})"><i class="fas fa-check"></i> Подтвердить продажу</button>` : ''}
-                    <button class="btn btn-secondary" onclick="openChatByOrder(${o.id})"><i class="fas fa-comments"></i> Чат</button>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-window.confirmSale = function(orderId) {
-    if (!confirm('Подтвердить продажу? Количество товара уменьшится.')) return;
-    const orders = getData('orders');
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    order.status = 'confirmed';
-    setData('orders', orders);
-
-    const products = getData('products');
-    const product = products.find(p => p.id === order.productId);
-    if (product) {
-        product.quantity -= order.quantity;
-        if (product.quantity <= 0) {
-            const idx = products.indexOf(product);
-            products.splice(idx, 1);
         }
-        setData('products', products);
+
+        alert('Продажа подтверждена!');
+        renderSales();
+        renderMyProducts();
+    };
+
+    window.openChatByOrder = async function(orderId) {
+        const chatsSnapshot = await getDocs(query(collection(db, 'chats'), where('orderId', '==', orderId)));
+        if (!chatsSnapshot.empty) {
+            const chat = chatsSnapshot.docs[0];
+            window.location.href = `chat.html?chatId=${chat.id}`;
+        } else {
+            alert('Чат не найден');
+        }
+    };
+
+    renderSales();
+
+    // Мои покупки
+    async function renderPurchases() {
+        const container = document.getElementById('purchasesContent');
+        if (!container) return;
+        
+        const ordersSnapshot = await getDocs(query(collection(db, 'orders'), where('buyerId', '==', user.uid)));
+        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        if (orders.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-bag"></i><p>У вас пока нет покупок</p></div>';
+            return;
+        }
+        
+        container.innerHTML = orders.map(o => `
+            <div class="order-card">
+                <div class="order-header">
+                    <div>
+                        <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
+                        <div style="font-size: 13px; color: var(--color-text-muted);">Продавец: ${o.sellerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
+                    </div>
+                    <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : 'Завершено'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div>
+                        <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
+                        <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
+                    </div>
+                    <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат с продавцом</button>
+                </div>
+            </div>
+        `).join('');
     }
 
-    alert('Продажа подтверждена!');
+    renderPurchases();
+}
+
+// Отправка жалобы
+async function submitReport(type, targetId, reportedUserId, reason) {
     const user = getCurrentUser();
-    renderSales(user);
-    renderMyProducts(user);
-};
-
-window.openChatByOrder = function(orderId) {
-    const chats = getData('chats');
-    const chat = chats.find(c => c.orderId === orderId);
-    if (chat) window.location.href = `chat.html?chatId=${chat.id}`;
-    else alert('Чат не найден');
-};
-
-function renderPurchases(user) {
-    const container = document.getElementById('purchasesContent');
-    if (!container) return;
-    const orders = getData('orders').filter(o => o.buyerId === user.id);
-    if (orders.length === 0) {
-        container.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-bag"></i><p>У вас пока нет покупок</p></div>';
-        return;
-    }
-    container.innerHTML = orders.map(o => `
-        <div class="order-card">
-            <div class="order-header">
-                <div>
-                    <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
-                    <div style="font-size: 13px; color: var(--color-text-muted);">Продавец: ${o.sellerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
-                </div>
-                <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : 'Завершено'}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                <div>
-                    <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
-                    <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
-                </div>
-                <button class="btn btn-secondary" onclick="openChatByOrder(${o.id})"><i class="fas fa-comments"></i> Чат с продавцом</button>
-            </div>
-        </div>
-    `).join('');
+    if (!user) return;
+    
+    await addDoc(collection(db, 'reports'), {
+        type,
+        targetId,
+        reportedUserId,
+        reporterId: user.uid,
+        reporterName: user.displayName || user.email,
+        reason,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+    });
 }
 
-function loadDeliverySettings(user) {
-    const methods = user.deliveryMethods || [];
-    const courierEnabled = document.getElementById('courierEnabled');
-    const courierPrice = document.getElementById('courierPrice');
-    const courierTime = document.getElementById('courierTime');
-
-    if (courierEnabled && courierPrice && courierTime) {
-        const courier = methods.find(m => m.type === 'courier');
-        if (courier) {
-            courierEnabled.checked = true;
-            courierPrice.value = courier.price;
-            courierTime.value = courier.time || '';
-        }
-    }
-
-    const container = document.getElementById('pickupPointsContainer');
-    if (container) {
-        container.innerHTML = '';
-        methods.filter(m => m.type === 'pickup').forEach(point => {
-            const div = document.createElement('div');
-            div.className = 'pickup-point';
-            div.innerHTML = `
-                <div class="pickup-point-header">
-                    <label class="checkbox-label"><input type="checkbox" class="pickup-enabled" checked><span>Активен</span></label>
-                    <button type="button" class="btn-remove" onclick="this.closest('.pickup-point').remove()"><i class="fas fa-trash"></i></button>
-                </div>
-                <div class="form-group"><label>Название</label><input type="text" class="pickup-name" value="${point.name}" required></div>
-                <div class="form-group"><label>Адрес</label><input type="text" class="pickup-address" value="${point.address}" required></div>
-                <div class="form-group"><label>Стоимость (АР)</label><input type="number" class="pickup-price" value="${point.price}" min="0" step="10"></div>
-            `;
-            container.appendChild(div);
-        });
-    }
-}
-
-// ==================== ПРОДАВЦЫ ====================
-function initSellers() {
+// Инициализация продавцов
+async function initSellers() {
     const grid = document.getElementById('sellersGrid');
     if (!grid) return;
 
-    const products = getData('products');
-    const users = getData('users');
+    const productsSnapshot = await getDocs(collection(db, 'products'));
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    
     const sellersMap = {};
-    products.forEach(p => {
+    productsSnapshot.docs.forEach(doc => {
+        const p = doc.data();
         if (p.sellerId) {
-            if (!sellersMap[p.sellerId]) sellersMap[p.sellerId] = { name: p.sellerName, count: 0, id: p.sellerId };
+            if (!sellersMap[p.sellerId]) {
+                sellersMap[p.sellerId] = { name: p.sellerName, count: 0, id: p.sellerId };
+            }
             sellersMap[p.sellerId].count++;
         }
     });
 
     const sellers = Object.values(sellersMap);
+    const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
     if (sellers.length === 0) {
         grid.innerHTML = '<div class="empty-state"><i class="fas fa-store"></i><p>Пока нет продавцов</p></div>';
         return;
@@ -996,19 +957,19 @@ function initSellers() {
     }).join('');
 }
 
-// ==================== СТРАНИЦА ПРОДАВЦА ====================
-function initSellerPage() {
+// Страница продавца
+async function initSellerPage() {
     const params = new URLSearchParams(window.location.search);
-    const sellerId = parseInt(params.get('id'));
+    const sellerId = params.get('id');
     if (!sellerId) return;
 
-    const users = getData('users');
-    const seller = users.find(u => u.id === sellerId);
-    if (!seller) {
+    const sellerDoc = await getDoc(doc(db, 'users', sellerId));
+    if (!sellerDoc.exists()) {
         document.querySelector('.container').innerHTML = '<div class="empty-state"><p>Продавец не найден</p></div>';
         return;
     }
 
+    const seller = sellerDoc.data();
     const title = document.getElementById('sellerTitle');
     const bio = document.getElementById('sellerBio');
     const nameBc = document.getElementById('sellerNameBc');
@@ -1032,13 +993,16 @@ function initSellerPage() {
         }
     }
 
-    const products = getData('products').filter(p => p.sellerId === sellerId);
+    const productsSnapshot = await getDocs(query(collection(db, 'products'), where('sellerId', '==', sellerId)));
+    const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     renderProducts('sellerProductsGrid', products);
 
     const reportBtn = document.getElementById('reportSellerBtn');
     if (reportBtn) {
         const user = getCurrentUser();
-        if (user && user.id === sellerId) reportBtn.style.display = 'none';
+        if (user && user.uid === sellerId) {
+            reportBtn.style.display = 'none';
+        }
         reportBtn.onclick = () => {
             const reason = prompt('Причина жалобы на продавца:');
             if (reason && reason.trim()) {
@@ -1049,27 +1013,8 @@ function initSellerPage() {
     }
 }
 
-// ==================== ЖАЛОБЫ ====================
-function submitReport(type, targetId, reportedUserId, reason) {
-    const user = getCurrentUser();
-    if (!user) return;
-    const reports = getData('reports');
-    reports.push({
-        id: Date.now(),
-        type,
-        targetId,
-        reportedUserId,
-        reporterId: user.id,
-        reporterName: user.name,
-        reason,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-    });
-    setData('reports', reports);
-}
-
-// ==================== ЧАТ ====================
-function initChat() {
+// Инициализация чата
+async function initChat() {
     const messagesContainer = document.getElementById('chatMessages');
     const input = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendMessageBtn');
@@ -1085,29 +1030,34 @@ function initChat() {
     }
 
     const params = new URLSearchParams(window.location.search);
-    const chatId = parseFloat(params.get('chatId'));
+    const chatId = params.get('chatId');
 
-    const chats = getData('chats');
-    const chat = chats.find(c => c.id === chatId);
-
-    if (!chat) {
+    const chatDoc = await getDoc(doc(db, 'chats', chatId));
+    if (!chatDoc.exists()) {
         messagesContainer.innerHTML = '<div class="empty-state"><p>Чат не найден</p></div>';
         return;
     }
 
-    if (chat.buyerId !== user.id && chat.sellerId !== user.id) {
+    const chat = chatDoc.data();
+    if (chat.buyerId !== user.uid && chat.sellerId !== user.uid) {
         messagesContainer.innerHTML = '<div class="empty-state"><p>У вас нет доступа к этому чату</p></div>';
         return;
     }
 
-    const otherUser = getData('users').find(u => u.id === (chat.buyerId === user.id ? chat.sellerId : chat.buyerId));
-    if (chatTitle) chatTitle.textContent = `Чат с ${otherUser?.name || 'пользователем'}`;
+    const otherUserId = chat.buyerId === user.uid ? chat.sellerId : chat.buyerId;
+    const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
+    const otherUser = otherUserDoc.data();
+    
+    if (chatTitle) {
+        chatTitle.textContent = `Чат с ${otherUser?.name || 'пользователем'}`;
+    }
 
     if (chatProductInfo) {
         chatProductInfo.style.display = 'block';
         const imgEl = document.getElementById('chatProductImage');
         const titleEl = document.getElementById('chatProductTitle');
         const priceEl = document.getElementById('chatProductPrice');
+        
         if (imgEl) {
             imgEl.innerHTML = chat.productImage ? `<img src="${chat.productImage}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas ${chat.productIcon || 'fa-cube'}"></i>`;
         }
@@ -1115,201 +1065,44 @@ function initChat() {
         if (priceEl) priceEl.textContent = `${chat.productPrice.toLocaleString('ru-RU')} АР`;
     }
 
-    function renderMessages() {
-        const currentChats = getData('chats');
-        const currentChat = currentChats.find(c => c.id === chatId);
-        if (!currentChat) return;
-        messagesContainer.innerHTML = currentChat.messages.map(m => `
-            <div class="chat-message ${m.userId === user.id ? 'own' : ''}">
+    // Подписка на сообщения
+    onSnapshot(doc(db, 'chats', chatId), (doc) => {
+        const chatData = doc.data();
+        messagesContainer.innerHTML = chatData.messages.map(m => `
+            <div class="chat-message ${m.userId === user.uid ? 'own' : ''}">
                 <div>${m.text}</div>
                 <div class="meta">${m.time}</div>
             </div>
         `).join('');
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
+    });
 
     function sendMessage() {
         const text = input.value.trim();
         if (!text) return;
 
-        const currentChats = getData('chats');
-        const currentChat = currentChats.find(c => c.id === chatId);
-        if (!currentChat) return;
-
-        currentChat.messages.push({
-            id: Date.now(),
-            userId: user.id,
-            text,
-            time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        const chatRef = doc(db, 'chats', chatId);
+        getDoc(chatRef).then(docSnap => {
+            const chatData = docSnap.data();
+            const newMessage = {
+                id: Date.now(),
+                userId: user.uid,
+                text,
+                time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+            };
+            updateDoc(chatRef, {
+                messages: [...chatData.messages, newMessage]
+            });
         });
-        setData('chats', currentChats);
+        
         input.value = '';
-        renderMessages();
     }
 
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
     if (input) input.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
-
-    const reportChatBtn = document.getElementById('reportChatBtn');
-    if (reportChatBtn) {
-        reportChatBtn.onclick = () => {
-            const otherUserId = chat.buyerId === user.id ? chat.sellerId : chat.buyerId;
-            const reason = prompt('Причина жалобы:');
-            if (reason && reason.trim()) {
-                submitReport('user', otherUserId, otherUserId, reason.trim());
-                alert('Жалоба отправлена');
-            }
-        };
-    }
-
-    renderMessages();
 }
 
-// ==================== АДМИНКА ====================
-function initAdmin() {
-    const user = getCurrentUser();
-    if (!user || user.role !== 'admin') { window.location.href = 'index.html'; return; }
-
-    const navLinks = document.querySelectorAll('.admin-nav-link');
-    const sections = document.querySelectorAll('.admin-section');
-
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const target = link.getAttribute('href').substring(1);
-            navLinks.forEach(l => l.classList.remove('active'));
-            sections.forEach(s => s.classList.remove('active'));
-            link.classList.add('active');
-            document.getElementById(target)?.classList.add('active');
-        });
-    });
-
-    const usersBody = document.getElementById('usersTableBody');
-    if (usersBody) {
-        const users = getData('users');
-        usersBody.innerHTML = users.map(u => `
-            <tr>
-                <td>${u.id}</td>
-                <td>${u.name}</td>
-                <td>${u.email}</td>
-                <td><span class="badge badge-${u.role || 'user'}">${u.role || 'user'}</span></td>
-                <td>
-                    ${u.role !== 'admin' ? `<button class="btn btn-danger btn-small" onclick="adminDeleteUser(${u.id})"><i class="fas fa-trash"></i></button>` : '-'}
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    const productsBody = document.getElementById('productsTableBody');
-    if (productsBody) {
-        const products = getData('products');
-        productsBody.innerHTML = products.map(p => `
-            <tr>
-                <td>${p.id}</td>
-                <td>${p.title}</td>
-                <td>${p.price.toLocaleString('ru-RU')} АР</td>
-                <td>${p.categoryName || p.category}</td>
-                <td>${p.quantity} шт</td>
-                <td>${p.sellerName || '-'}</td>
-                <td><button class="btn btn-danger btn-small" onclick="adminDeleteProduct(${p.id})"><i class="fas fa-trash"></i></button></td>
-            </tr>
-        `).join('');
-    }
-
-    const reportsContent = document.getElementById('reportsContent');
-    if (reportsContent) {
-        const reports = getData('reports');
-        if (reports.length === 0) {
-            reportsContent.innerHTML = '<div class="empty-state"><i class="fas fa-flag"></i><p>Жалоб нет</p></div>';
-        } else {
-            reportsContent.innerHTML = reports.map(r => {
-                const reported = getData('users').find(u => u.id === r.reportedUserId);
-                return `
-                    <div class="report-card">
-                        <div class="report-header">
-                            <div>
-                                <div style="font-weight: 700;">Жалоба на: ${reported?.name || 'Неизвестно'} (${r.type})</div>
-                                <div style="font-size: 13px; color: var(--color-text-muted);">От: ${r.reporterName} • ${new Date(r.createdAt).toLocaleString('ru-RU')}</div>
-                            </div>
-                            <span class="report-type">${r.type === 'product' ? 'Товар' : r.type === 'seller' ? 'Продавец' : 'Пользователь'}</span>
-                        </div>
-                        <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-card); border-radius: var(--radius-xs); border-left: 3px solid var(--color-danger);">
-                            <strong>Причина:</strong> ${r.reason}
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button class="btn btn-danger btn-small" onclick="adminResolveReport(${r.id}, 'ban')"><i class="fas fa-ban"></i> Забанить</button>
-                            <button class="btn btn-secondary btn-small" onclick="adminResolveReport(${r.id}, 'dismiss')"><i class="fas fa-times"></i> Отклонить</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-    }
-
-    const adminOrdersContent = document.getElementById('adminOrdersContent');
-    if (adminOrdersContent) {
-        const orders = getData('orders');
-        if (orders.length === 0) {
-            adminOrdersContent.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-bag"></i><p>Заказов нет</p></div>';
-        } else {
-            adminOrdersContent.innerHTML = orders.map(o => `
-                <div class="order-card">
-                    <div class="order-header">
-                        <div>
-                            <div style="font-weight: 700;">${o.productTitle}</div>
-                            <div style="font-size: 13px; color: var(--color-text-muted);">Покупатель: ${o.buyerName} • Продавец: ${o.sellerName}</div>
-                        </div>
-                        <span class="order-status ${o.status}">${o.status}</span>
-                    </div>
-                    <div>Количество: ${o.quantity} шт • Сумма: ${o.total.toLocaleString('ru-RU')} АР</div>
-                </div>
-            `).join('');
-        }
-    }
-
-    const logoutBtn = document.getElementById('adminLogoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            localStorage.setItem('currentUser', 'null');
-            window.location.href = 'index.html';
-        });
-    }
-}
-
-window.adminDeleteUser = function(id) {
-    if (!confirm('Удалить пользователя?')) return;
-    const users = getData('users').filter(u => u.id !== id);
-    setData('users', users);
-    initAdmin();
-};
-
-window.adminDeleteProduct = function(id) {
-    if (!confirm('Удалить товар?')) return;
-    const products = getData('products').filter(p => p.id !== id);
-    setData('products', products);
-    initAdmin();
-};
-
-window.adminResolveReport = function(id, action) {
-    const reports = getData('reports');
-    const report = reports.find(r => r.id === id);
-    if (!report) return;
-
-    if (action === 'ban') {
-        const users = getData('users');
-        const idx = users.findIndex(u => u.id === report.reportedUserId);
-        if (idx !== -1) {
-            users.splice(idx, 1);
-            setData('users', users);
-            alert('Пользователь забанен (удалён)');
-        }
-    }
-
-    report.status = action;
-    setData('reports', reports.filter(r => r.id !== id));
-    initAdmin();
-};
-
+// Поиск в шапке
 function doHeaderSearch() {
     const searchInput = document.getElementById('headerSearch');
     if (!searchInput) return;
@@ -1317,38 +1110,44 @@ function doHeaderSearch() {
     if (query) window.location.href = `catalog.html?search=${encodeURIComponent(query)}`;
 }
 
-function initLogout() {
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            localStorage.setItem('currentUser', 'null');
-            window.location.href = 'index.html';
-        });
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    initData();
-    updateHeader();
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', async () => {
+    await initCategories();
     initScrollAnimations();
-    initLogout();
+    updateHeader();
 
-    if (document.getElementById('categoriesGrid')) renderCategories('categoriesGrid');
-    if (document.getElementById('productsGrid') && document.getElementById('searchInput')) initCatalog();
+    if (document.getElementById('categoriesGrid')) {
+        renderCategories('categoriesGrid');
+    }
+
+    if (document.getElementById('productsGrid') && document.getElementById('searchInput')) {
+        initCatalog();
+    }
+
     if (document.getElementById('productsGrid') && !document.getElementById('searchInput') && !document.getElementById('sellerProductsGrid') && !document.getElementById('myProductsGrid')) {
-        const products = getData('products').filter(p => p.quantity > 0).slice(0, 8);
-        renderProducts('productsGrid', products);
+        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const popular = products.filter(p => p.quantity > 0).slice(0, 8);
+        renderProducts('productsGrid', popular);
     }
 
     if (document.querySelector('.profile-layout')) {
-        const user = getCurrentUser();
-        if (!user) window.location.href = 'login.html';
-        else initProfile();
+        initProfile();
     }
 
-    if (document.querySelector('.admin-layout')) initAdmin();
-    if (document.querySelector('.chat-container')) initChat();
-    if (document.getElementById('sellersGrid')) initSellers();
-    if (document.getElementById('sellerProductsGrid')) initSellerPage();
-    if (document.getElementById('cartItems')) initCart();
+    if (document.querySelector('.admin-layout')) {
+        // Админка будет позже
+    }
+
+    if (document.querySelector('.chat-container')) {
+        initChat();
+    }
+
+    if (document.getElementById('sellersGrid')) {
+        initSellers();
+    }
+
+    if (document.getElementById('sellerProductsGrid')) {
+        initSellerPage();
+    }
 });
