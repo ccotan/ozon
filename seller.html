@@ -17,10 +17,9 @@
                     <button class="search-btn" onclick="doHeaderSearch()"><i class="fas fa-search"></i></button>
                 </div>
                 <nav class="nav">
-                    <a href="index.html" class="nav-link"><i class="fas fa-home"></i> Главная</a>
-                    <a href="catalog.html" class="nav-link"><i class="fas fa-th"></i> Каталог</a>
+                    <a href="index.html" class="nav-link">Главная</a>
+                    <a href="catalog.html" class="nav-link">Каталог</a>
                     <a href="sellers.html" class="nav-link active"><i class="fas fa-store"></i> Продавцы</a>
-                    <a href="cart.html" class="nav-link"><i class="fas fa-shopping-cart"></i> Корзина <span id="cartCount" class="badge badge-admin" style="margin-left: 5px;">0</span></a>
                 </nav>
                 <div class="header-actions">
                     <a href="login.html" class="btn btn-primary" id="loginBtn"><i class="fas fa-user"></i> Войти</a>
@@ -30,13 +29,7 @@
             </div>
         </div>
     </header>
-
-    <div class="breadcrumbs">
-        <div class="container">
-            <a href="index.html">Главная</a><span>›</span><a href="sellers.html">Продавцы</a><span>›</span><span id="sellerNameBc">Магазин</span>
-        </div>
-    </div>
-
+    <div class="breadcrumbs"><div class="container"><a href="index.html">Главная</a><span>›</span><a href="sellers.html">Продавцы</a><span>›</span><span id="sellerNameBc">Магазин</span></div></div>
     <main class="main">
         <div class="container">
             <div class="seller-page-header">
@@ -50,18 +43,13 @@
                     <button class="btn btn-danger" id="reportSellerBtn"><i class="fas fa-flag"></i> Пожаловаться</button>
                 </div>
             </div>
-
             <section class="products">
                 <h2>Товары продавца</h2>
                 <div class="products-grid" id="sellerProductsGrid"></div>
             </section>
         </div>
     </main>
-
-    <footer class="footer">
-        <div class="container"><p>&copy; 2026 Ozon Minecraft</p></div>
-    </footer>
-
-    <script src="script.js"></script>
+    <footer class="footer"><div class="container"><p>&copy; 2026 Ozon Minecraft</p></div></footer>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
