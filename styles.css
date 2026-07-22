@@ -1243,3 +1243,45 @@ body {
     .btn { padding: 10px 16px; font-size: 14px; }
     .btn-large { padding: 12px 24px; font-size: 16px; }
 }
+
+/* Объёмная 3D кнопка Каталога */
+.btn-3d {
+    background: linear-gradient(180deg, #D4FF33 0%, #A8E600 100%);
+    color: #000;
+    font-weight: 800;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 28px;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 
+        0 6px 0 #7AB800, 
+        0 10px 10px rgba(0,0,0,0.3),
+        inset 0 1px 0 rgba(255,255,255,0.4);
+    transition: all 0.1s ease;
+    position: relative;
+    top: 0;
+}
+
+.btn-3d:hover {
+    background: linear-gradient(180deg, #E4FF66 0%, #B8F000 100%);
+    transform: translateY(-2px);
+    box-shadow: 
+        0 8px 0 #7AB800, 
+        0 14px 14px rgba(0,0,0,0.3),
+        inset 0 1px 0 rgba(255,255,255,0.4);
+}
+
+.btn-3d:active {
+    transform: translateY(4px);
+    box-shadow: 
+        0 2px 0 #7AB800, 
+        0 4px 4px rgba(0,0,0,0.3),
+        inset 0 1px 0 rgba(255,255,255,0.4);
+}
+
+.btn-3d i {
+    margin-right: 8px;
+    font-size: 18px;
+}
