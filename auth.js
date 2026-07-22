@@ -23,23 +23,17 @@ export async function logoutUser() {
     window.location.href = 'index.html';
 }
 
-// Вход через Google
 export async function signInWithGoogle() {
     try {
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
-        
-        // Проверяем, есть ли пользователь в Firestore
-        const userDocRef = doc(db, 'users', user.uid);
         const userDocSnap = await getDocs(collection(db, 'users'));
         const exists = userDocSnap.docs.some(d => d.id === user.uid);
         
         if (!exists) {
-            // Создаём нового пользователя
             const usersCount = userDocSnap.size;
             const role = usersCount === 0 ? 'admin' : 'user';
-            
-            await setDoc(userDocRef, {
+            await setDoc(doc(db, 'users', user.uid), {
                 uid: user.uid,
                 name: user.displayName || 'Пользователь',
                 email: user.email,
@@ -54,7 +48,6 @@ export async function signInWithGoogle() {
                 createdAt: new Date().toISOString()
             });
         }
-        
         return user;
     } catch (error) {
         console.error('Ошибка входа через Google:', error);
@@ -64,7 +57,6 @@ export async function signInWithGoogle() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Кнопка входа через Google
     const googleBtn = document.getElementById('googleLoginBtn');
     if (googleBtn) {
         googleBtn.addEventListener('click', async () => {
@@ -75,22 +67,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Регистрация
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const name = document.getElementById('regName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
-            const login = document.getElementById('regLogin').value.trim();
             const password = document.getElementById('regPassword').value;
             const passwordConfirm = document.getElementById('regPasswordConfirm').value;
 
-            if (!name || !email || !login || !password) { 
-                alert('Заполните все поля'); 
-                return; 
-            }
+            if (!name || !email || !password) { alert('Заполните все поля'); return; }
             if (password.length < 8) { alert('Минимум 8 символов'); return; }
             if (!/[0-9]/.test(password)) { alert('Нужна хотя бы одна цифра'); return; }
             if (!/[A-ZА-ЯЁ]/.test(password)) { alert('Нужна заглавная буква'); return; }
@@ -99,13 +85,12 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
-                
                 const users = await getDocs(collection(db, 'users'));
                 const role = users.empty ? 'admin' : 'user';
-                
                 await setDoc(doc(db, 'users', user.uid), {
                     uid: user.uid,
-                    name, email, login,
+                    name, email,
+                    login: email.split('@')[0],
                     role,
                     phone: '', bio: '',
                     avatar: null, background: null,
@@ -113,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     provider: 'email',
                     createdAt: new Date().toISOString()
                 });
-                
                 window.location.href = 'profile.html';
             } catch (error) {
                 alert('Ошибка: ' + error.message);
@@ -121,19 +105,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Вход по email/паролю
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const email = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value;
 
-            if (!email || !password) { 
-                alert('Заполните все поля'); 
-                return; 
-            }
+            if (!email || !password) { alert('Заполните все поля'); return; }
 
             try {
                 await signInWithEmailAndPassword(auth, email, password);
