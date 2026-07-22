@@ -3,6 +3,7 @@ import { db, auth } from './firebase.js';
 import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, onSnapshot, query, where } from './firebase.js';
 import { compressImage, validateImage } from './imageUtils.js';
 
+// ==================== ИНИЦИАЛИЗАЦИЯ ====================
 async function initCategories() {
     const categoriesRef = collection(db, 'categories');
     const snapshot = await getDocs(categoriesRef);
@@ -40,6 +41,7 @@ function initScrollAnimations() {
     document.querySelectorAll('.animate-on-scroll').forEach(el => obs.observe(el));
 }
 
+// ==================== ШАПКА ====================
 function updateHeader() {
     const user = getCurrentUser();
     const loginBtn = document.getElementById('loginBtn');
@@ -47,6 +49,7 @@ function updateHeader() {
     const logoutBtn = document.getElementById('logoutBtn');
     const userName = document.getElementById('userName');
     const cartCount = document.getElementById('cartCount');
+    const adminBtn = document.getElementById('adminBtn');
 
     if (user) {
         if (loginBtn) loginBtn.classList.add('hidden');
@@ -58,10 +61,19 @@ function updateHeader() {
             logoutBtn.classList.remove('hidden');
             logoutBtn.onclick = () => logoutUser();
         }
+        
+        getDoc(doc(db, 'users', user.uid)).then(doc => {
+            if (doc.exists() && doc.data().role === 'admin') {
+                if (adminBtn) adminBtn.classList.remove('hidden');
+            } else {
+                if (adminBtn) adminBtn.classList.add('hidden');
+            }
+        });
     } else {
         if (loginBtn) loginBtn.classList.remove('hidden');
         if (profileBtn) profileBtn.classList.add('hidden');
         if (logoutBtn) logoutBtn.classList.add('hidden');
+        if (adminBtn) adminBtn.classList.add('hidden');
     }
 
     if (cartCount) {
@@ -73,6 +85,7 @@ function updateHeader() {
 
 window.updateHeaderCallback = updateHeader;
 
+// ==================== КАТЕГОРИИ ====================
 async function renderCategories(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -86,6 +99,7 @@ async function renderCategories(containerId) {
     `).join('');
 }
 
+// ==================== ТОВАРЫ ====================
 function renderProducts(containerId, products = []) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -94,6 +108,8 @@ function renderProducts(containerId, products = []) {
         container.innerHTML = '<div class="empty-state"><i class="fas fa-box-open"></i><p>Товары не найдены</p></div>';
         return;
     }
+
+    const user = getCurrentUser();
 
     container.innerHTML = products.map(p => `
         <div class="product-card" data-id="${p.id}">
@@ -111,11 +127,15 @@ function renderProducts(containerId, products = []) {
                 </div>
                 ${p.delivery ? `<div class="product-delivery"><i class="fas fa-truck"></i> ${p.delivery}</div>` : ''}
                 <div class="product-seller"><i class="fas fa-store"></i> ${p.sellerName || 'Неизвестно'}</div>
-                <div style="margin-top: 12px; display: flex; gap: 8px;">
-                    ${getCurrentUser() && getCurrentUser().uid !== p.sellerId && p.quantity > 0 ? 
-                        `<button class="btn btn-primary btn-small" onclick="event.stopPropagation(); window.buyProductDirect('${p.id}')" style="flex: 1;"><i class="fas fa-bolt"></i> Купить</button>` : ''}
-                    ${getCurrentUser() && getCurrentUser().uid !== p.sellerId ? 
-                        `<button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); window.contactAboutProduct('${p.id}')" style="flex: 1;"><i class="fas fa-comment"></i> Написать</button>` : ''}
+                <div class="product-actions">
+                    ${user && user.uid !== p.sellerId && p.quantity > 0 ? 
+                        `<button class="btn btn-primary" onclick="event.stopPropagation(); window.buyProductDirect('${p.id}')">
+                            <i class="fas fa-bolt"></i> Купить
+                        </button>` : ''}
+                    ${user && user.uid !== p.sellerId && p.quantity > 0 ? 
+                        `<button class="btn btn-secondary" onclick="event.stopPropagation(); window.addToCart('${p.id}')">
+                            <i class="fas fa-cart-plus"></i> В корзину
+                        </button>` : ''}
                 </div>
             </div>
         </div>
@@ -135,6 +155,14 @@ window.buyProductDirect = async function(productId) {
     if (productDoc.exists()) {
         const product = { id: productDoc.id, ...productDoc.data() };
         buyProduct(product);
+    }
+};
+
+window.addToCart = async function(productId) {
+    const productDoc = await getDoc(doc(db, 'products', productId));
+    if (productDoc.exists()) {
+        const product = { id: productDoc.id, ...productDoc.data() };
+        addToCart(product);
     }
 };
 
@@ -176,6 +204,7 @@ window.contactAboutProduct = async function(productId) {
     }
 };
 
+// ==================== МОДАЛКА ТОВАРА ====================
 function showProductModal(product) {
     const user = getCurrentUser();
     const existing = document.getElementById('productModal');
@@ -221,7 +250,7 @@ function showProductModal(product) {
     if (buyNowBtn) buyNowBtn.onclick = () => { modal.remove(); buyProduct(product); };
 
     const addToCartBtn = document.getElementById('addToCartBtn');
-    if (addToCartBtn) addToCartBtn.onclick = () => { addToCart(product); modal.remove(); };
+    if (addToCartBtn) addToCartBtn.onclick = () => { modal.remove(); addToCart(product); };
 
     const contactBtn = document.getElementById('contactBtn');
     if (contactBtn) contactBtn.onclick = () => { modal.remove(); window.contactAboutProduct(product.id); };
@@ -251,6 +280,7 @@ function showProductModal(product) {
     }
 }
 
+// ==================== ПОКУПКА ====================
 async function buyProduct(product) {
     const user = getCurrentUser();
     if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
@@ -273,6 +303,7 @@ async function buyProduct(product) {
         sellerId: product.sellerId,
         sellerName: product.sellerName,
         status: 'pending',
+        delivery: product.delivery,
         createdAt: new Date().toISOString()
     };
     const orderRef = await addDoc(collection(db, 'orders'), order);
@@ -295,10 +326,18 @@ async function buyProduct(product) {
         createdAt: new Date().toISOString()
     });
 
+    await createNotification(
+        product.sellerId,
+        'Новый заказ',
+        `${user.displayName || user.email} купил "${product.title}"`,
+        `profile.html#sales`
+    );
+
     alert('Заказ оформлен! Чат с продавцом открыт.');
     window.location.href = `chat.html?chatId=${chatRef.id}`;
 }
 
+// ==================== КОРЗИНА ====================
 function addToCart(product) {
     const user = getCurrentUser();
     if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
@@ -306,17 +345,187 @@ function addToCart(product) {
 
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     const existing = cart.find(i => i.productId === product.id);
+    
     if (existing) {
-        if (existing.quantity < product.quantity) existing.quantity++;
-        else { alert('Достигнуто максимальное количество'); return; }
+        if (existing.quantity < product.quantity) {
+            existing.quantity++;
+        } else { 
+            alert('Достигнуто максимальное количество'); 
+            return; 
+        }
     } else {
-        cart.push({ productId: product.id, quantity: 1 });
+        cart.push({ 
+            productId: product.id,
+            title: product.title,
+            price: product.price,
+            image: product.image,
+            icon: product.icon,
+            quantity: 1,
+            sellerId: product.sellerId,
+            sellerName: product.sellerName
+        });
     }
+    
     localStorage.setItem('cart', JSON.stringify(cart));
     updateHeader();
-    alert('Товар добавлен в корзину');
+    showNotification('Товар добавлен в корзину', 'success');
 }
 
+function removeFromCart(productId) {
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const newCart = cart.filter(i => i.productId !== productId);
+    localStorage.setItem('cart', JSON.stringify(newCart));
+    updateHeader();
+    initCart();
+}
+
+function changeCartQty(productId, delta) {
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const item = cart.find(i => i.productId === productId);
+    if (!item) return;
+
+    item.quantity += delta;
+    if (item.quantity <= 0) {
+        removeFromCart(productId);
+    } else {
+        localStorage.setItem('cart', JSON.stringify(cart));
+        updateHeader();
+        initCart();
+    }
+}
+
+async function initCart() {
+    const cartItemsEl = document.getElementById('cartItems');
+    const cartSummary = document.getElementById('cartSummary');
+    const cartTotal = document.getElementById('cartTotal');
+    const checkoutBtn = document.getElementById('checkoutBtn');
+
+    if (!cartItemsEl) return;
+
+    const user = getCurrentUser();
+    if (!user) { 
+        cartItemsEl.innerHTML = '<div class="empty-state"><p>Войдите, чтобы использовать корзину</p></div>'; 
+        return; 
+    }
+
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+
+    if (cart.length === 0) {
+        cartItemsEl.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-cart"></i><p>Корзина пуста</p></div>';
+        return;
+    }
+
+    let total = 0;
+    cartItemsEl.innerHTML = cart.map(item => {
+        const subtotal = item.price * item.quantity;
+        total += subtotal;
+        return `
+            <div class="cart-item">
+                <div class="cart-item-image">
+                    ${item.image ? `<img src="${item.image}">` : `<i class="fas ${item.icon || 'fa-cube'}"></i>`}
+                </div>
+                <div class="cart-item-info">
+                    <div class="cart-item-title">${item.title}</div>
+                    <div class="cart-item-price">${item.price.toLocaleString('ru-RU')} АР × ${item.quantity} = ${subtotal.toLocaleString('ru-RU')} АР</div>
+                    <div style="font-size: 12px; color: var(--color-text-muted);">Продавец: ${item.sellerName}</div>
+                </div>
+                <div class="cart-item-controls">
+                    <div class="quantity-control">
+                        <button class="quantity-btn" onclick="changeCartQty('${item.productId}', -1)">-</button>
+                        <span class="quantity-value">${item.quantity}</span>
+                        <button class="quantity-btn" onclick="changeCartQty('${item.productId}', 1)">+</button>
+                    </div>
+                    <button class="btn btn-danger btn-small" onclick="removeFromCart('${item.productId}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    if (cartTotal) cartTotal.textContent = total.toLocaleString('ru-RU') + ' АР';
+    if (cartSummary) cartSummary.style.display = 'flex';
+
+    if (checkoutBtn) {
+        checkoutBtn.onclick = () => checkoutCart();
+    }
+}
+
+async function checkoutCart() {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    if (cart.length === 0) return;
+
+    const orders = [];
+
+    for (const item of cart) {
+        const productDoc = await getDoc(doc(db, 'products', item.productId));
+        if (!productDoc.exists()) continue;
+        
+        const product = productDoc.data();
+        if (product.quantity < item.quantity) {
+            alert(`Товар "${item.title}" закончился`);
+            continue;
+        }
+        if (product.sellerId === user.uid) continue;
+
+        const order = {
+            productId: item.productId,
+            productTitle: item.title,
+            productImage: item.image,
+            productIcon: item.icon,
+            price: item.price,
+            quantity: item.quantity,
+            total: item.price * item.quantity,
+            buyerId: user.uid,
+            buyerName: user.displayName || user.email,
+            sellerId: product.sellerId,
+            sellerName: product.sellerName,
+            status: 'pending',
+            delivery: product.delivery,
+            createdAt: new Date().toISOString()
+        };
+        
+        const orderRef = await addDoc(collection(db, 'orders'), order);
+        orders.push(orderRef.id);
+
+        await addDoc(collection(db, 'chats'), {
+            orderId: orderRef.id,
+            buyerId: user.uid,
+            sellerId: product.sellerId,
+            productId: item.productId,
+            productTitle: item.title,
+            productImage: item.image,
+            productIcon: item.icon,
+            productPrice: item.price,
+            messages: [{
+                id: 1,
+                userId: user.uid,
+                text: `Здравствуйте! Я купил "${item.title}" (${item.quantity} шт). Жду подтверждения.`,
+                time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+            }],
+            createdAt: new Date().toISOString()
+        });
+        
+        await createNotification(
+            product.sellerId,
+            'Новый заказ',
+            `${user.displayName || user.email} купил "${item.title}"`,
+            `profile.html#sales`
+        );
+    }
+
+    if (orders.length > 0) {
+        localStorage.setItem('cart', '[]');
+        updateHeader();
+        alert(`Заказ оформлен! Товаров: ${orders.length}`);
+        window.location.href = 'profile.html#purchases';
+    }
+}
+
+// ==================== КАТАЛОГ ====================
 async function initCatalog() {
     const searchInput = document.getElementById('searchInput');
     const categoryFilters = document.getElementById('categoryFilters');
@@ -389,12 +598,20 @@ async function initCatalog() {
     loadAndRender();
 }
 
+// ==================== ПРОФИЛЬ ====================
 async function initProfile() {
     const user = getCurrentUser();
     if (!user) { window.location.href = 'login.html'; return; }
 
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     const userData = userDoc.exists() ? userDoc.data() : {};
+
+    // Проверка бана
+    if (userData.banned) {
+        alert('Ваш аккаунт заблокирован: ' + (userData.banReason || 'Причина не указана'));
+        await logoutUser();
+        return;
+    }
 
     const navLinks = document.querySelectorAll('.profile-nav-link');
     const sections = document.querySelectorAll('.profile-section');
@@ -422,6 +639,12 @@ async function initProfile() {
     if (bioInput) bioInput.value = userData.bio || '';
     if (sidebarUserName) sidebarUserName.textContent = userData.name || user.displayName || 'Пользователь';
 
+    // Показ ссылки на админку
+    if (userData.role === 'admin') {
+        const adminLink = document.getElementById('adminLink');
+        if (adminLink) adminLink.style.display = 'flex';
+    }
+
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
         profileForm.addEventListener('submit', async (e) => {
@@ -436,6 +659,7 @@ async function initProfile() {
         });
     }
 
+    // Аватар и фон
     const avatarInput = document.getElementById('avatarInput');
     const bgInput = document.getElementById('bgInput');
     const previewAvatar = document.getElementById('previewAvatar');
@@ -505,6 +729,7 @@ async function initProfile() {
         };
     }
 
+    // Добавление товара
     const addProductForm = document.getElementById('addProductForm');
     if (addProductForm) {
         const categorySelect = document.getElementById('productCategory');
@@ -539,6 +764,10 @@ async function initProfile() {
             const description = document.getElementById('productDescription').value;
             const delivery = document.getElementById('productDelivery').value;
 
+            // Опции доставки
+            const deliveryCourier = document.getElementById('deliveryCourier')?.checked || false;
+            const deliveryPickup = document.getElementById('deliveryPickup')?.checked || false;
+
             if (!title || !price || isNaN(quantity)) { alert('Заполните обязательные поля'); return; }
 
             const categories = await getDocs(collection(db, 'categories'));
@@ -549,6 +778,8 @@ async function initProfile() {
                 title, price, category,
                 categoryName: cat?.name || category,
                 description, quantity, delivery,
+                deliveryCourier,
+                deliveryPickup,
                 sellerId: user.uid,
                 sellerName: userData.name || user.displayName || user.email,
                 icon: cat?.icon || 'fa-cube',
@@ -579,6 +810,7 @@ async function initProfile() {
 
     renderMyProducts();
 
+    // Настройки доставки
     const deliveryForm = document.getElementById('deliveryForm');
     if (deliveryForm) {
         const courierEnabled = document.getElementById('courierEnabled');
@@ -608,7 +840,10 @@ async function initProfile() {
                         <div class="form-group"><label>Название</label><input type="text" class="pickup-name" value="${point.name}" required></div>
                         <div class="form-group">
                             <label>Координаты (X Y Z)</label>
-                            <input type="text" class="pickup-coords" value="${point.coords || ''}" placeholder="100 64 -200" required>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" class="pickup-coords" value="${point.coords || ''}" placeholder="100 64 -200" required style="flex: 1;">
+                                <button type="button" class="copy-coords-btn" onclick="copyCoords(this)"><i class="fas fa-copy"></i> Копировать</button>
+                            </div>
                             <small class="form-hint">Например: 100 64 -200</small>
                         </div>
                         <div class="form-group"><label>Стоимость (АР)</label><input type="number" class="pickup-price" value="${point.price}" min="0" step="10"></div>
@@ -658,7 +893,10 @@ async function initProfile() {
                 <div class="form-group"><label>Название пункта</label><input type="text" class="pickup-name" placeholder="Моя база" required></div>
                 <div class="form-group">
                     <label>Координаты (X Y Z)</label>
-                    <input type="text" class="pickup-coords" placeholder="100 64 -200" required>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" class="pickup-coords" placeholder="100 64 -200" required style="flex: 1;">
+                        <button type="button" class="copy-coords-btn" onclick="copyCoords(this)"><i class="fas fa-copy"></i> Копировать</button>
+                    </div>
                     <small class="form-hint">Например: 100 64 -200</small>
                 </div>
                 <div class="form-group"><label>Стоимость (АР)</label><input type="number" class="pickup-price" placeholder="0" min="0" step="10"></div>
@@ -667,6 +905,7 @@ async function initProfile() {
         });
     }
 
+    // Продажи
     async function renderSales() {
         const container = document.getElementById('salesContent');
         if (!container) return;
@@ -683,15 +922,16 @@ async function initProfile() {
                         <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
                         <div style="font-size: 13px; color: var(--color-text-muted);">Покупатель: ${o.buyerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
                     </div>
-                    <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : 'Завершено'}</span>
+                    <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : o.status === 'cancelled' ? 'Отменено' : 'Завершено'}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                     <div>
                         <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
                         <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
                     </div>
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         ${o.status === 'pending' ? `<button class="btn btn-success" onclick="window.confirmSale('${o.id}', '${o.productId}', ${o.quantity})"><i class="fas fa-check"></i> Подтвердить продажу</button>` : ''}
+                        ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelSale('${o.id}', '${o.productId}', ${o.quantity})"><i class="fas fa-times"></i> Отменить</button>` : ''}
                         <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат</button>
                     </div>
                 </div>
@@ -717,6 +957,19 @@ async function initProfile() {
         renderMyProducts();
     };
 
+    window.cancelSale = async function(orderId, productId, quantity) {
+        if (!confirm('Отменить продажу? Товар вернётся на склад.')) return;
+        await updateDoc(doc(db, 'orders', orderId), { status: 'cancelled' });
+        const productDoc = await getDoc(doc(db, 'products', productId));
+        if (productDoc.exists()) {
+            const product = productDoc.data();
+            await updateDoc(doc(db, 'products', productId), { quantity: product.quantity + quantity });
+        }
+        alert('Продажа отменена');
+        renderSales();
+        renderMyProducts();
+    };
+
     window.openChatByOrder = async function(orderId) {
         const chatsSnapshot = await getDocs(query(collection(db, 'chats'), where('orderId', '==', orderId)));
         if (!chatsSnapshot.empty) {
@@ -729,6 +982,7 @@ async function initProfile() {
 
     renderSales();
 
+    // Покупки
     async function renderPurchases() {
         const container = document.getElementById('purchasesContent');
         if (!container) return;
@@ -745,22 +999,60 @@ async function initProfile() {
                         <div style="font-weight: 700; font-size: 18px; color: var(--color-white);">${o.productTitle}</div>
                         <div style="font-size: 13px; color: var(--color-text-muted);">Продавец: ${o.sellerName} • ${new Date(o.createdAt).toLocaleString('ru-RU')}</div>
                     </div>
-                    <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : 'Завершено'}</span>
+                    <span class="order-status ${o.status}">${o.status === 'pending' ? 'Ожидает' : o.status === 'confirmed' ? 'Подтверждено' : o.status === 'cancelled' ? 'Отменено' : 'Завершено'}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                     <div>
                         <div style="font-size: 14px; color: var(--color-text-secondary);">Количество: <strong>${o.quantity} шт</strong></div>
                         <div style="font-size: 22px; font-weight: 800; color: var(--color-lime);">${o.total.toLocaleString('ru-RU')} АР</div>
                     </div>
-                    <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат с продавцом</button>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        ${o.status === 'pending' ? `<button class="cancel-btn" onclick="window.cancelPurchase('${o.id}')"><i class="fas fa-times"></i> Отменить покупку</button>` : ''}
+                        <button class="btn btn-secondary" onclick="window.openChatByOrder('${o.id}')"><i class="fas fa-comments"></i> Чат с продавцом</button>
+                    </div>
                 </div>
             </div>
         `).join('');
     }
 
+    window.cancelPurchase = async function(orderId) {
+        if (!confirm('Отменить покупку?')) return;
+        await updateDoc(doc(db, 'orders', orderId), { status: 'cancelled' });
+        alert('Покупка отменена');
+        renderPurchases();
+    };
+
     renderPurchases();
 }
 
+// ==================== УВЕДОМЛЕНИЯ ====================
+async function createNotification(userId, title, message, link = '') {
+    await addDoc(collection(db, 'notifications'), {
+        userId,
+        title,
+        message,
+        link,
+        read: false,
+        createdAt: new Date().toISOString()
+    });
+}
+
+function showNotification(text, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.innerHTML = `
+        <div class="notification-header">
+            <span class="notification-title">${type === 'success' ? '✓ Успешно' : type === 'error' ? '✕ Ошибка' : 'ℹ Информация'}</span>
+            <button class="notification-close" onclick="this.closest('.notification').remove()">×</button>
+        </div>
+        <div class="notification-message">${text}</div>
+        <div class="notification-time">${new Date().toLocaleTimeString('ru-RU')}</div>
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => { notification.remove(); }, 5000);
+}
+
+// ==================== ЖАЛОБЫ ====================
 async function submitReport(type, targetId, reportedUserId, reason) {
     const user = getCurrentUser();
     if (!user) return;
@@ -773,6 +1065,7 @@ async function submitReport(type, targetId, reportedUserId, reason) {
     });
 }
 
+// ==================== ПРОДАВЦЫ ====================
 async function initSellers() {
     const grid = document.getElementById('sellersGrid');
     if (!grid) return;
@@ -867,6 +1160,7 @@ async function initSellerPage() {
     }
 }
 
+// ==================== ЧАТ ====================
 async function initChat() {
     const messagesContainer = document.getElementById('chatMessages');
     const input = document.getElementById('chatInput');
@@ -884,68 +1178,291 @@ async function initChat() {
 
     const params = new URLSearchParams(window.location.search);
     const chatId = params.get('chatId');
-
-    const chatDoc = await getDoc(doc(db, 'chats', chatId));
-    if (!chatDoc.exists()) {
+    
+    if (!chatId) {
         messagesContainer.innerHTML = '<div class="empty-state"><p>Чат не найден</p></div>';
         return;
     }
 
-    const chat = chatDoc.data();
-    if (chat.buyerId !== user.uid && chat.sellerId !== user.uid) {
-        messagesContainer.innerHTML = '<div class="empty-state"><p>У вас нет доступа к этому чату</p></div>';
+    try {
+        const chatDoc = await getDoc(doc(db, 'chats', chatId));
+        if (!chatDoc.exists()) {
+            messagesContainer.innerHTML = '<div class="empty-state"><p>Чат не найден</p></div>';
+            return;
+        }
+
+        const chat = chatDoc.data();
+        
+        if (chat.buyerId !== user.uid && chat.sellerId !== user.uid) {
+            messagesContainer.innerHTML = '<div class="empty-state"><p>У вас нет доступа к этому чату</p></div>';
+            return;
+        }
+
+        const otherUserId = chat.buyerId === user.uid ? chat.sellerId : chat.buyerId;
+        const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
+        const otherUser = otherUserDoc.data();
+        
+        if (chatTitle) {
+            chatTitle.textContent = `Чат с ${otherUser?.name || 'пользователем'}`;
+        }
+
+        if (chatProductInfo && chat.productTitle) {
+            chatProductInfo.style.display = 'block';
+            const imgEl = document.getElementById('chatProductImage');
+            const titleEl = document.getElementById('chatProductTitle');
+            const priceEl = document.getElementById('chatProductPrice');
+            
+            if (imgEl) {
+                imgEl.innerHTML = chat.productImage ? 
+                    `<img src="${chat.productImage}" style="width: 100%; height: 100%; object-fit: cover;">` : 
+                    `<i class="fas ${chat.productIcon || 'fa-cube'}"></i>`;
+            }
+            if (titleEl) titleEl.textContent = chat.productTitle;
+            if (priceEl) priceEl.textContent = `${chat.productPrice.toLocaleString('ru-RU')} АР`;
+        }
+
+        onSnapshot(doc(db, 'chats', chatId), (doc) => {
+            const chatData = doc.data();
+            if (!chatData.messages) return;
+            
+            messagesContainer.innerHTML = chatData.messages.map(m => `
+                <div class="chat-message ${m.userId === user.uid ? 'own' : ''}">
+                    <div>${escapeHtml(m.text)}</div>
+                    <div class="meta">${m.time}</div>
+                </div>
+            `).join('');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        });
+
+        function sendMessage() {
+            const text = input.value.trim();
+            if (!text) return;
+
+            const chatRef = doc(db, 'chats', chatId);
+            getDoc(chatRef).then(docSnap => {
+                if (!docSnap.exists()) return;
+                
+                const chatData = docSnap.data();
+                const newMessage = {
+                    id: Date.now(),
+                    userId: user.uid,
+                    text: text,
+                    time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                };
+                
+                updateDoc(chatRef, { 
+                    messages: [...(chatData.messages || []), newMessage] 
+                }).then(() => {
+                    createNotification(
+                        otherUserId,
+                        'Новое сообщение',
+                        `${user.displayName || user.email} написал(а) вам`,
+                        `chat.html?chatId=${chatId}`
+                    );
+                });
+            });
+            
+            input.value = '';
+        }
+
+        if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+        if (input) {
+            input.addEventListener('keypress', (e) => { 
+                if (e.key === 'Enter') sendMessage(); 
+            });
+        }
+
+    } catch (error) {
+        console.error('Ошибка загрузки чата:', error);
+        messagesContainer.innerHTML = '<div class="empty-state"><p>Ошибка загрузки чата</p></div>';
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ==================== АДМИНКА ====================
+async function initAdmin() {
+    const user = getCurrentUser();
+    if (!user) { window.location.href = 'index.html'; return; }
+
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (!userDoc.exists() || userDoc.data().role !== 'admin') {
+        window.location.href = 'index.html';
         return;
     }
 
-    const otherUserId = chat.buyerId === user.uid ? chat.sellerId : chat.buyerId;
-    const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
-    const otherUser = otherUserDoc.data();
-    if (chatTitle) chatTitle.textContent = `Чат с ${otherUser?.name || 'пользователем'}`;
+    const navLinks = document.querySelectorAll('.admin-nav-link');
+    const sections = document.querySelectorAll('.admin-section');
 
-    if (chatProductInfo) {
-        chatProductInfo.style.display = 'block';
-        const imgEl = document.getElementById('chatProductImage');
-        const titleEl = document.getElementById('chatProductTitle');
-        const priceEl = document.getElementById('chatProductPrice');
-        if (imgEl) {
-            imgEl.innerHTML = chat.productImage ? `<img src="${chat.productImage}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas ${chat.productIcon || 'fa-cube'}"></i>`;
-        }
-        if (titleEl) titleEl.textContent = chat.productTitle;
-        if (priceEl) priceEl.textContent = `${chat.productPrice.toLocaleString('ru-RU')} АР`;
-    }
-
-    onSnapshot(doc(db, 'chats', chatId), (doc) => {
-        const chatData = doc.data();
-        messagesContainer.innerHTML = chatData.messages.map(m => `
-            <div class="chat-message ${m.userId === user.uid ? 'own' : ''}">
-                <div>${m.text}</div>
-                <div class="meta">${m.time}</div>
-            </div>
-        `).join('');
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = link.getAttribute('href').substring(1);
+            navLinks.forEach(l => l.classList.remove('active'));
+            sections.forEach(s => s.classList.remove('active'));
+            link.classList.add('active');
+            document.getElementById(target)?.classList.add('active');
+        });
     });
 
-    function sendMessage() {
-        const text = input.value.trim();
-        if (!text) return;
-        const chatRef = doc(db, 'chats', chatId);
-        getDoc(chatRef).then(docSnap => {
-            const chatData = docSnap.data();
-            const newMessage = {
-                id: Date.now(),
-                userId: user.uid,
-                text,
-                time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-            };
-            updateDoc(chatRef, { messages: [...chatData.messages, newMessage] });
-        });
-        input.value = '';
+    // Пользователи
+    const usersBody = document.getElementById('usersTableBody');
+    if (usersBody) {
+        const users = await getDocs(collection(db, 'users'));
+        usersBody.innerHTML = users.docs.map(doc => {
+            const u = doc.data();
+            return `
+                <tr>
+                    <td>${doc.id.substring(0, 8)}...</td>
+                    <td>${u.name || '-'}</td>
+                    <td>${u.email || '-'}</td>
+                    <td><span class="badge badge-${u.role || 'user'}">${u.role || 'user'}</span></td>
+                    <td><span class="user-ban-status ${u.banned ? 'banned' : 'active'}">${u.banned ? 'Забанен' : 'Активен'}</span></td>
+                    <td>
+                        ${u.role !== 'admin' ? `
+                            ${u.banned ? 
+                                `<button class="btn btn-success btn-small" onclick="window.unbanUser('${doc.id}')"><i class="fas fa-unlock"></i> Разбанить</button>` : 
+                                `<button class="btn btn-danger btn-small" onclick="window.banUser('${doc.id}')"><i class="fas fa-ban"></i> Забанить</button>`
+                            }
+                        ` : '-'}
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 
-    if (sendBtn) sendBtn.addEventListener('click', sendMessage);
-    if (input) input.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+    // Товары
+    const productsBody = document.getElementById('productsTableBody');
+    if (productsBody) {
+        const products = await getDocs(collection(db, 'products'));
+        productsBody.innerHTML = products.docs.map(doc => {
+            const p = doc.data();
+            return `
+                <tr>
+                    <td>${doc.id.substring(0, 8)}...</td>
+                    <td>${p.title}</td>
+                    <td>${p.price.toLocaleString('ru-RU')} АР</td>
+                    <td>${p.categoryName || p.category}</td>
+                    <td>${p.quantity} шт</td>
+                    <td>${p.sellerName || '-'}</td>
+                    <td><button class="btn btn-danger btn-small" onclick="window.adminDeleteProduct('${doc.id}')"><i class="fas fa-trash"></i></button></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Жалобы
+    const reportsContent = document.getElementById('reportsContent');
+    if (reportsContent) {
+        const reports = await getDocs(collection(db, 'reports'));
+        if (reports.empty) {
+            reportsContent.innerHTML = '<div class="empty-state"><i class="fas fa-flag"></i><p>Жалоб нет</p></div>';
+        } else {
+            reportsContent.innerHTML = reports.docs.map(doc => {
+                const r = doc.data();
+                return `
+                    <div class="report-card">
+                        <div class="report-header">
+                            <div>
+                                <div style="font-weight: 700;">Жалоба на: ${r.reporterName || 'Неизвестно'} (${r.type})</div>
+                                <div style="font-size: 13px; color: var(--color-text-muted);">От: ${r.reporterName} • ${new Date(r.createdAt).toLocaleString('ru-RU')}</div>
+                            </div>
+                            <span class="report-type">${r.type === 'product' ? 'Товар' : r.type === 'seller' ? 'Продавец' : 'Пользователь'}</span>
+                        </div>
+                        <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-card); border-radius: var(--radius-xs); border-left: 3px solid var(--color-danger);">
+                            <strong>Причина:</strong> ${r.reason}
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-danger btn-small" onclick="window.adminBanFromReport('${r.reportedUserId}', '${r.reason}')"><i class="fas fa-ban"></i> Забанить</button>
+                            <button class="btn btn-secondary btn-small" onclick="window.adminDismissReport('${doc.id}')"><i class="fas fa-times"></i> Отклонить</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // Заказы
+    const adminOrdersContent = document.getElementById('adminOrdersContent');
+    if (adminOrdersContent) {
+        const orders = await getDocs(collection(db, 'orders'));
+        if (orders.empty) {
+            adminOrdersContent.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-bag"></i><p>Заказов нет</p></div>';
+        } else {
+            adminOrdersContent.innerHTML = orders.docs.map(doc => {
+                const o = doc.data();
+                return `
+                    <div class="order-card">
+                        <div class="order-header">
+                            <div>
+                                <div style="font-weight: 700;">${o.productTitle}</div>
+                                <div style="font-size: 13px; color: var(--color-text-muted);">Покупатель: ${o.buyerName} • Продавец: ${o.sellerName}</div>
+                            </div>
+                            <span class="order-status ${o.status}">${o.status}</span>
+                        </div>
+                        <div>Количество: ${o.quantity} шт • Сумма: ${o.total.toLocaleString('ru-RU')} АР</div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    const logoutBtn = document.getElementById('adminLogoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => logoutUser());
+    }
 }
 
+window.banUser = async function(userId) {
+    const reason = prompt('Причина бана:');
+    if (!reason) return;
+    await updateDoc(doc(db, 'users', userId), {
+        banned: true,
+        banReason: reason,
+        bannedAt: new Date().toISOString()
+    });
+    alert('Пользователь забанен');
+    initAdmin();
+};
+
+window.unbanUser = async function(userId) {
+    await updateDoc(doc(db, 'users', userId), {
+        banned: false,
+        banReason: null,
+        bannedAt: null
+    });
+    alert('Пользователь разбанен');
+    initAdmin();
+};
+
+window.adminBanFromReport = async function(userId, reason) {
+    await updateDoc(doc(db, 'users', userId), {
+        banned: true,
+        banReason: reason,
+        bannedAt: new Date().toISOString()
+    });
+    alert('Пользователь забанен');
+    initAdmin();
+};
+
+window.adminDismissReport = async function(reportId) {
+    await deleteDoc(doc(db, 'reports', reportId));
+    alert('Жалоба отклонена');
+    initAdmin();
+};
+
+window.adminDeleteProduct = async function(productId) {
+    if (!confirm('Удалить товар?')) return;
+    await deleteDoc(doc(db, 'products', productId));
+    alert('Товар удалён');
+    initAdmin();
+};
+
+// ==================== УТИЛИТЫ ====================
 function doHeaderSearch() {
     const searchInput = document.getElementById('headerSearch');
     if (!searchInput) return;
@@ -953,6 +1470,18 @@ function doHeaderSearch() {
     if (query) window.location.href = `catalog.html?search=${encodeURIComponent(query)}`;
 }
 
+window.copyCoords = function(btn) {
+    const input = btn.parentElement.querySelector('.pickup-coords');
+    if (input && input.value) {
+        navigator.clipboard.writeText(input.value).then(() => {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Скопировано';
+            setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
+        });
+    }
+};
+
+// ==================== ЗАПУСК ====================
 document.addEventListener('DOMContentLoaded', async () => {
     await initCategories();
     initScrollAnimations();
@@ -968,7 +1497,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (document.querySelector('.profile-layout')) initProfile();
+    if (document.querySelector('.admin-layout')) initAdmin();
     if (document.querySelector('.chat-container')) initChat();
     if (document.getElementById('sellersGrid')) initSellers();
     if (document.getElementById('sellerProductsGrid')) initSellerPage();
+    if (document.getElementById('cartItems')) initCart();
 });
