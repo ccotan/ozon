@@ -244,7 +244,27 @@ body {
     background: rgba(192, 255, 0, 0.1);
     border-color: var(--color-lime);
 }
-.header-actions { display: flex; gap: 12px; align-items: center; }
+.header-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+.admin-btn {
+    background: var(--color-danger);
+    color: white;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: var(--transition);
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+.admin-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(255, 68, 102, 0.4);
+}
 
 .breadcrumbs { 
     background: var(--bg-secondary);
@@ -465,6 +485,17 @@ body {
 }
 .product-seller i { width: 14px; text-align: center; }
 
+.product-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.product-actions .btn {
+    flex: 1;
+    min-width: 120px;
+}
+
 .auth-container { display: flex; justify-content: center; align-items: center; padding: 60px 0; }
 .auth-card { 
     background: var(--bg-card);
@@ -664,7 +695,14 @@ body {
     border: 2px solid var(--color-border);
     height: fit-content;
 }
-.profile-avatar { text-align: center; margin-bottom: 30px; }
+.profile-avatar { 
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center; 
+    margin-bottom: 30px; 
+}
 .avatar-circle { 
     width: 100px; 
     height: 100px; 
@@ -674,14 +712,20 @@ body {
     align-items: center; 
     justify-content: center; 
     font-size: 40px; 
-    margin: 0 auto 15px;
+    margin: 0 auto;
     color: #000;
     box-shadow: var(--shadow-glow);
     overflow: hidden;
 }
 .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
 .avatar-circle i { width: 40px; text-align: center; }
-.user-name-display { font-weight: 700; font-size: 18px; color: var(--color-white); }
+.user-name-display { 
+    font-weight: 700; 
+    font-size: 18px; 
+    color: var(--color-white);
+    text-align: center;
+    line-height: 1;
+}
 .profile-nav { display: flex; flex-direction: column; gap: 6px; }
 .profile-nav-link { 
     display: flex; 
@@ -842,15 +886,38 @@ body {
     gap: 10px;
 }
 .order-status {
-    padding: 6px 12px;
+    padding: 8px 16px;
     border-radius: var(--radius-xs);
-    font-size: 12px;
     font-weight: 700;
+    font-size: 12px;
     text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 .order-status.pending { background: var(--color-warning); color: #000; }
 .order-status.confirmed { background: var(--color-success); color: #000; }
 .order-status.completed { background: var(--color-info); color: #000; }
+.order-status.cancelled { background: var(--color-danger); color: white; }
+
+.cancel-btn {
+    background: var(--color-danger);
+    color: white;
+    padding: 10px 16px;
+    border-radius: var(--radius-xs);
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+.cancel-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(255, 68, 102, 0.4);
+}
 
 .report-card {
     background: var(--bg-tertiary);
@@ -1084,6 +1151,21 @@ body {
 .badge-admin { background: var(--color-lime); color: #000; }
 .badge-user { background: var(--bg-tertiary); color: var(--color-text-secondary); }
 
+.user-ban-status {
+    padding: 4px 8px;
+    border-radius: var(--radius-xs);
+    font-size: 11px;
+    font-weight: 700;
+}
+.user-ban-status.banned {
+    background: var(--color-danger);
+    color: white;
+}
+.user-ban-status.active {
+    background: var(--color-success);
+    color: #000;
+}
+
 .delivery-settings { max-width: 750px; }
 .delivery-method-card { 
     background: var(--bg-tertiary);
@@ -1109,6 +1191,7 @@ body {
     border: 2px solid var(--color-border);
 }
 .pickup-point-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+
 .copy-coords-btn {
     background: var(--bg-tertiary);
     border: 2px solid var(--color-border);
@@ -1122,12 +1205,57 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    margin-top: 8px;
 }
 .copy-coords-btn:hover {
     background: var(--color-lime);
     color: #000;
     border-color: var(--color-lime);
+}
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--bg-card);
+    border: 2px solid var(--color-lime);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    box-shadow: var(--shadow-glow);
+    z-index: 10000;
+    max-width: 350px;
+    animation: slideIn 0.3s ease;
+}
+@keyframes slideIn {
+    from { transform: translateX(400px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.notification-title {
+    font-weight: 700;
+    color: var(--color-lime);
+}
+.notification-close {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 18px;
+}
+.notification-close:hover { color: var(--color-text); }
+.notification-message {
+    color: var(--color-text);
+    font-size: 14px;
+    line-height: 1.4;
+}
+.notification-time {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-top: 8px;
 }
 
 .animate-on-scroll { 
@@ -1198,158 +1326,4 @@ body {
     .categories-grid { grid-template-columns: repeat(2, 1fr); }
     .btn { padding: 10px 16px; font-size: 14px; }
     .btn-large { padding: 12px 24px; font-size: 16px; }
-}
-/* Выравнивание ника в профиле */
-.profile-avatar {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-}
-
-.user-name-display {
-    font-weight: 700;
-    font-size: 18px;
-    color: var(--color-white);
-    text-align: center;
-    line-height: 1;
-}
-
-/* Кнопка Админ в шапке */
-.admin-btn {
-    background: var(--color-danger);
-    color: white;
-    padding: 10px 20px;
-    border-radius: var(--radius-sm);
-    font-weight: 700;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    transition: var(--transition);
-}
-.admin-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(255, 68, 102, 0.4);
-}
-
-/* Уведомления */
-.notification {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: var(--bg-card);
-    border: 2px solid var(--color-lime);
-    border-radius: var(--radius-sm);
-    padding: 20px;
-    box-shadow: var(--shadow-glow);
-    z-index: 10000;
-    max-width: 350px;
-    animation: slideIn 0.3s ease;
-}
-@keyframes slideIn {
-    from { transform: translateX(400px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-.notification-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-.notification-title {
-    font-weight: 700;
-    color: var(--color-lime);
-}
-.notification-close {
-    background: none;
-    border: none;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    font-size: 18px;
-}
-.notification-close:hover { color: var(--color-text); }
-.notification-message {
-    color: var(--color-text);
-    font-size: 14px;
-    line-height: 1.4;
-}
-.notification-time {
-    font-size: 11px;
-    color: var(--color-text-muted);
-    margin-top: 8px;
-}
-
-/* Статусы заказов */
-.order-status.cancelled { 
-    background: var(--color-danger); 
-    color: white; 
-}
-
-/* Кнопки отмены */
-.cancel-btn {
-    background: var(--color-danger);
-    color: white;
-    padding: 10px 16px;
-    border-radius: var(--radius-xs);
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    transition: var(--transition);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-.cancel-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(255, 68, 102, 0.4);
-}
-
-/* Карточка товара - кнопки */
-.product-actions {
-    margin-top: 12px;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-.product-actions .btn {
-    flex: 1;
-    min-width: 120px;
-}
-
-/* Бан пользователей в админке */
-.user-ban-status {
-    padding: 4px 8px;
-    border-radius: var(--radius-xs);
-    font-size: 11px;
-    font-weight: 700;
-}
-.user-ban-status.banned {
-    background: var(--color-danger);
-    color: white;
-}
-.user-ban-status.active {
-    background: var(--color-success);
-    color: #000;
-}
-
-/* Кнопка копирования координат */
-.copy-coords-btn {
-    background: var(--bg-tertiary);
-    border: 2px solid var(--color-border);
-    color: var(--color-lime);
-    padding: 10px 16px;
-    border-radius: var(--radius-xs);
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    transition: var(--transition);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-.copy-coords-btn:hover {
-    background: var(--color-lime);
-    color: #000;
-    border-color: var(--color-lime);
 }
