@@ -3,7 +3,7 @@ import {
     signInWithPopup, createUserWithEmailAndPassword, 
     signInWithEmailAndPassword, signOut, onAuthStateChanged 
 } from './firebase.js';
-import { doc, setDoc, getDocs, collection } from './firebase.js';
+import { doc, setDoc, getDocs, collection, getDoc } from './firebase.js';
 
 let currentUser = null;
 
