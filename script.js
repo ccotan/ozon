@@ -7,15 +7,27 @@ import { compressImage, validateImage } from './imageUtils.js';
 async function initCategories() {
     const categoriesRef = collection(db, 'categories');
     const snapshot = await getDocs(categoriesRef);
-    if (snapshot.empty) {
-        const defaultCategories = [
-            { id: 'blocks', name: 'Блоки', icon: 'fa-cube' },
-            { id: 'items', name: 'Предметы', icon: 'fa-gem' },
-            { id: 'mobs', name: 'Мобы', icon: 'fa-dragon' },
-            { id: 'services', name: 'Услуги', icon: 'fa-hands-helping' },
-            { id: 'other', name: 'Другое', icon: 'fa-ellipsis-h' }
-        ];
-        for (const cat of defaultCategories) {
+    
+    // Удаляем пустые документы
+    for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        if (!data.name || !data.id) {
+            await deleteDoc(doc(db, 'categories', docSnap.id));
+        }
+    }
+    
+    // Создаём категории если их нет
+    const defaultCategories = [
+        { id: 'blocks', name: 'Блоки', icon: 'fa-cube' },
+        { id: 'items', name: 'Предметы', icon: 'fa-gem' },
+        { id: 'mobs', name: 'Мобы', icon: 'fa-dragon' },
+        { id: 'services', name: 'Услуги', icon: 'fa-hands-helping' },
+        { id: 'other', name: 'Другое', icon: 'fa-ellipsis-h' }
+    ];
+    
+    for (const cat of defaultCategories) {
+        const catDoc = await getDoc(doc(db, 'categories', cat.id));
+        if (!catDoc.exists()) {
             await setDoc(doc(db, 'categories', cat.id), cat);
         }
     }
@@ -90,7 +102,7 @@ async function renderCategories(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const categories = await getDocs(collection(db, 'categories'));
-    const cats = categories.docs.map(doc => doc.data());
+    const cats = categories.docs.map(doc => doc.data()).filter(c => c.name);
     container.innerHTML = cats.map(cat => `
         <a href="catalog.html?category=${cat.id}" class="category-card">
             <div class="category-icon"><i class="fas ${cat.icon}"></i></div>
@@ -118,7 +130,7 @@ function renderProducts(containerId, products = []) {
                 ${p.quantity === 0 ? '<div class="product-badge" style="background: var(--color-danger); color: white;">Нет в наличии</div>' : ''}
             </div>
             <div class="product-info">
-                <div class="product-category">${p.categoryName || ''}</div>
+                <div class="product-category">${p.categoryName || p.category || 'Без категории'}</div>
                 <div class="product-title">${p.title}</div>
                 <div class="product-price">${p.price.toLocaleString('ru-RU')} АР</div>
                 <div class="product-stock ${p.quantity > 0 ? '' : 'out'}">
@@ -142,7 +154,8 @@ function renderProducts(containerId, products = []) {
     `).join('');
 
     container.querySelectorAll('.product-card').forEach(card => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
             const id = card.dataset.id;
             const product = products.find(p => p.id === id);
             if (product) showProductModal(product);
@@ -204,7 +217,6 @@ window.contactAboutProduct = async function(productId) {
     }
 };
 
-// ==================== МОДАЛКА ТОВАРА ====================
 function showProductModal(product) {
     const user = getCurrentUser();
     const existing = document.getElementById('productModal');
@@ -280,30 +292,37 @@ function showProductModal(product) {
     }
 }
 
-// ==================== ПОКУПКА ====================
 async function buyProduct(product) {
     const user = getCurrentUser();
     if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
-    if (product.quantity <= 0) { alert('Товар закончился'); return; }
-    if (product.sellerId === user.uid) { alert('Нельзя купить свой товар'); return; }
+    
+    const productDoc = await getDoc(doc(db, 'products', product.id));
+    if (!productDoc.exists()) {
+        alert('Товар не найден');
+        return;
+    }
+    
+    const currentProduct = productDoc.data();
+    if (currentProduct.quantity <= 0) { alert('Товар закончился'); return; }
+    if (currentProduct.sellerId === user.uid) { alert('Нельзя купить свой товар'); return; }
 
-    const quantity = parseInt(prompt(`Сколько штук купить? (доступно: ${product.quantity})`, '1'));
-    if (!quantity || quantity <= 0 || quantity > product.quantity) { alert('Неверное количество'); return; }
+    const quantity = parseInt(prompt(`Сколько штук купить? (доступно: ${currentProduct.quantity})`, '1'));
+    if (!quantity || quantity <= 0 || quantity > currentProduct.quantity) { alert('Неверное количество'); return; }
 
     const order = {
         productId: product.id,
-        productTitle: product.title,
-        productImage: product.image || null,
-        productIcon: product.icon || 'fa-cube',
-        price: product.price,
+        productTitle: currentProduct.title,
+        productImage: currentProduct.image || null,
+        productIcon: currentProduct.icon || 'fa-cube',
+        price: currentProduct.price,
         quantity: quantity,
-        total: product.price * quantity,
+        total: currentProduct.price * quantity,
         buyerId: user.uid,
         buyerName: user.displayName || user.email,
-        sellerId: product.sellerId,
-        sellerName: product.sellerName,
+        sellerId: currentProduct.sellerId,
+        sellerName: currentProduct.sellerName,
         status: 'pending',
-        delivery: product.delivery,
+        delivery: currentProduct.delivery,
         createdAt: new Date().toISOString()
     };
     const orderRef = await addDoc(collection(db, 'orders'), order);
@@ -311,25 +330,25 @@ async function buyProduct(product) {
     const chatRef = await addDoc(collection(db, 'chats'), {
         orderId: orderRef.id,
         buyerId: user.uid,
-        sellerId: product.sellerId,
+        sellerId: currentProduct.sellerId,
         productId: product.id,
-        productTitle: product.title,
-        productImage: product.image || null,
-        productIcon: product.icon || 'fa-cube',
-        productPrice: product.price,
+        productTitle: currentProduct.title,
+        productImage: currentProduct.image || null,
+        productIcon: currentProduct.icon || 'fa-cube',
+        productPrice: currentProduct.price,
         messages: [{
             id: 1,
             userId: user.uid,
-            text: `Здравствуйте! Я купил "${product.title}" (${quantity} шт). Жду подтверждения.`,
+            text: `Здравствуйте! Я купил "${currentProduct.title}" (${quantity} шт). Жду подтверждения.`,
             time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
         }],
         createdAt: new Date().toISOString()
     });
 
     await createNotification(
-        product.sellerId,
+        currentProduct.sellerId,
         'Новый заказ',
-        `${user.displayName || user.email} купил "${product.title}"`,
+        `${user.displayName || user.email} купил "${currentProduct.title}"`,
         `profile.html#sales`
     );
 
@@ -337,7 +356,6 @@ async function buyProduct(product) {
     window.location.href = `chat.html?chatId=${chatRef.id}`;
 }
 
-// ==================== КОРЗИНА ====================
 function addToCart(product) {
     const user = getCurrentUser();
     if (!user) { alert('Войдите в аккаунт'); window.location.href = 'login.html'; return; }
@@ -525,7 +543,6 @@ async function checkoutCart() {
     }
 }
 
-// ==================== КАТАЛОГ ====================
 async function initCatalog() {
     const searchInput = document.getElementById('searchInput');
     const categoryFilters = document.getElementById('categoryFilters');
@@ -540,7 +557,7 @@ async function initCatalog() {
 
     if (categoryFilters) {
         const categories = await getDocs(collection(db, 'categories'));
-        const cats = categories.docs.map(doc => doc.data());
+        const cats = categories.docs.map(doc => doc.data()).filter(c => c.name);
         categoryFilters.innerHTML = cats.map(cat => `
             <label><input type="checkbox" value="${cat.id}" class="category-checkbox"> ${cat.name}</label>
         `).join('');
@@ -598,7 +615,6 @@ async function initCatalog() {
     loadAndRender();
 }
 
-// ==================== ПРОФИЛЬ ====================
 async function initProfile() {
     const user = getCurrentUser();
     if (!user) { window.location.href = 'login.html'; return; }
@@ -606,7 +622,6 @@ async function initProfile() {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     const userData = userDoc.exists() ? userDoc.data() : {};
 
-    // Проверка бана
     if (userData.banned) {
         alert('Ваш аккаунт заблокирован: ' + (userData.banReason || 'Причина не указана'));
         await logoutUser();
@@ -639,7 +654,6 @@ async function initProfile() {
     if (bioInput) bioInput.value = userData.bio || '';
     if (sidebarUserName) sidebarUserName.textContent = userData.name || user.displayName || 'Пользователь';
 
-    // Показ ссылки на админку
     if (userData.role === 'admin') {
         const adminLink = document.getElementById('adminLink');
         if (adminLink) adminLink.style.display = 'flex';
@@ -659,7 +673,6 @@ async function initProfile() {
         });
     }
 
-    // Аватар и фон
     const avatarInput = document.getElementById('avatarInput');
     const bgInput = document.getElementById('bgInput');
     const previewAvatar = document.getElementById('previewAvatar');
@@ -729,13 +742,12 @@ async function initProfile() {
         };
     }
 
-    // Добавление товара
     const addProductForm = document.getElementById('addProductForm');
     if (addProductForm) {
         const categorySelect = document.getElementById('productCategory');
         if (categorySelect) {
             const categories = await getDocs(collection(db, 'categories'));
-            const cats = categories.docs.map(doc => doc.data());
+            const cats = categories.docs.map(doc => doc.data()).filter(c => c.name);
             categorySelect.innerHTML = cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         }
 
@@ -764,10 +776,6 @@ async function initProfile() {
             const description = document.getElementById('productDescription').value;
             const delivery = document.getElementById('productDelivery').value;
 
-            // Опции доставки
-            const deliveryCourier = document.getElementById('deliveryCourier')?.checked || false;
-            const deliveryPickup = document.getElementById('deliveryPickup')?.checked || false;
-
             if (!title || !price || isNaN(quantity)) { alert('Заполните обязательные поля'); return; }
 
             const categories = await getDocs(collection(db, 'categories'));
@@ -778,8 +786,6 @@ async function initProfile() {
                 title, price, category,
                 categoryName: cat?.name || category,
                 description, quantity, delivery,
-                deliveryCourier,
-                deliveryPickup,
                 sellerId: user.uid,
                 sellerName: userData.name || user.displayName || user.email,
                 icon: cat?.icon || 'fa-cube',
@@ -810,7 +816,6 @@ async function initProfile() {
 
     renderMyProducts();
 
-    // Настройки доставки
     const deliveryForm = document.getElementById('deliveryForm');
     if (deliveryForm) {
         const courierEnabled = document.getElementById('courierEnabled');
@@ -905,7 +910,6 @@ async function initProfile() {
         });
     }
 
-    // Продажи
     async function renderSales() {
         const container = document.getElementById('salesContent');
         if (!container) return;
@@ -953,8 +957,7 @@ async function initProfile() {
             }
         }
         alert('Продажа подтверждена!');
-        renderSales();
-        renderMyProducts();
+        location.reload();
     };
 
     window.cancelSale = async function(orderId, productId, quantity) {
@@ -966,8 +969,7 @@ async function initProfile() {
             await updateDoc(doc(db, 'products', productId), { quantity: product.quantity + quantity });
         }
         alert('Продажа отменена');
-        renderSales();
-        renderMyProducts();
+        location.reload();
     };
 
     window.openChatByOrder = async function(orderId) {
@@ -982,7 +984,6 @@ async function initProfile() {
 
     renderSales();
 
-    // Покупки
     async function renderPurchases() {
         const container = document.getElementById('purchasesContent');
         if (!container) return;
@@ -1019,19 +1020,15 @@ async function initProfile() {
         if (!confirm('Отменить покупку?')) return;
         await updateDoc(doc(db, 'orders', orderId), { status: 'cancelled' });
         alert('Покупка отменена');
-        renderPurchases();
+        location.reload();
     };
 
     renderPurchases();
 }
 
-// ==================== УВЕДОМЛЕНИЯ ====================
 async function createNotification(userId, title, message, link = '') {
     await addDoc(collection(db, 'notifications'), {
-        userId,
-        title,
-        message,
-        link,
+        userId, title, message, link,
         read: false,
         createdAt: new Date().toISOString()
     });
@@ -1052,7 +1049,6 @@ function showNotification(text, type = 'info') {
     setTimeout(() => { notification.remove(); }, 5000);
 }
 
-// ==================== ЖАЛОБЫ ====================
 async function submitReport(type, targetId, reportedUserId, reason) {
     const user = getCurrentUser();
     if (!user) return;
@@ -1065,7 +1061,6 @@ async function submitReport(type, targetId, reportedUserId, reason) {
     });
 }
 
-// ==================== ПРОДАВЦЫ ====================
 async function initSellers() {
     const grid = document.getElementById('sellersGrid');
     if (!grid) return;
@@ -1160,7 +1155,6 @@ async function initSellerPage() {
     }
 }
 
-// ==================== ЧАТ ====================
 async function initChat() {
     const messagesContainer = document.getElementById('chatMessages');
     const input = document.getElementById('chatInput');
@@ -1284,7 +1278,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ==================== АДМИНКА ====================
 async function initAdmin() {
     const user = getCurrentUser();
     if (!user) { window.location.href = 'index.html'; return; }
@@ -1309,7 +1302,6 @@ async function initAdmin() {
         });
     });
 
-    // Пользователи
     const usersBody = document.getElementById('usersTableBody');
     if (usersBody) {
         const users = await getDocs(collection(db, 'users'));
@@ -1335,7 +1327,6 @@ async function initAdmin() {
         }).join('');
     }
 
-    // Товары
     const productsBody = document.getElementById('productsTableBody');
     if (productsBody) {
         const products = await getDocs(collection(db, 'products'));
@@ -1355,7 +1346,6 @@ async function initAdmin() {
         }).join('');
     }
 
-    // Жалобы
     const reportsContent = document.getElementById('reportsContent');
     if (reportsContent) {
         const reports = await getDocs(collection(db, 'reports'));
@@ -1386,7 +1376,6 @@ async function initAdmin() {
         }
     }
 
-    // Заказы
     const adminOrdersContent = document.getElementById('adminOrdersContent');
     if (adminOrdersContent) {
         const orders = await getDocs(collection(db, 'orders'));
@@ -1462,7 +1451,6 @@ window.adminDeleteProduct = async function(productId) {
     initAdmin();
 };
 
-// ==================== УТИЛИТЫ ====================
 function doHeaderSearch() {
     const searchInput = document.getElementById('headerSearch');
     if (!searchInput) return;
@@ -1481,7 +1469,6 @@ window.copyCoords = function(btn) {
     }
 };
 
-// ==================== ЗАПУСК ====================
 document.addEventListener('DOMContentLoaded', async () => {
     await initCategories();
     initScrollAnimations();
