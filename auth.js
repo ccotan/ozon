@@ -44,6 +44,7 @@ export async function signInWithGoogle() {
                 avatar: user.photoURL || null,
                 background: null,
                 deliveryMethods: [],
+                banned: false,
                 provider: 'google',
                 createdAt: new Date().toISOString()
             });
@@ -62,6 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
         googleBtn.addEventListener('click', async () => {
             const user = await signInWithGoogle();
             if (user) {
+                const userDoc = await getDoc(doc(db, 'users', user.uid));
+                if (userDoc.exists() && userDoc.data().banned) {
+                    alert('Ваш аккаунт заблокирован');
+                    await signOut(auth);
+                    return;
+                }
                 window.location.href = 'profile.html';
             }
         });
@@ -95,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     phone: '', bio: '',
                     avatar: null, background: null,
                     deliveryMethods: [],
+                    banned: false,
                     provider: 'email',
                     createdAt: new Date().toISOString()
                 });
