@@ -23,7 +23,6 @@
         </div>
     </header>
     <div class="breadcrumbs"><div class="container"><a href="index.html">Главная</a><span>›</span><span>Личный кабинет</span></div></div>
-    
     <main class="main">
         <div class="container">
             <div class="profile-layout">
@@ -152,18 +151,15 @@
             </div>
         </div>
     </main>
-    
     <script type="module" src="auth.js"></script>
     <script type="module" src="script.js"></script>
-    
-    <!-- Скрипт для копирования координат -->
     <script>
         function copyCoords(btn) {
             const input = btn.parentElement.querySelector('.pickup-coords');
             if (input && input.value) {
                 navigator.clipboard.writeText(input.value).then(() => {
                     const originalHTML = btn.innerHTML;
-                    btn.innerHTML = '<i class="fas fa-check" style="color: var(--color-success);"></i>';
+                    btn.innerHTML = '<i class="fas fa-check"></i> Скопировано';
                     setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
                 });
             }
